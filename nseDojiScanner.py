@@ -1,0 +1,146 @@
+#!/usr/bin/env python
+# coding: utf-8
+'''
+The objective of this program is to scan for Hammer (dragonfly & gravestone doji) candlestick formation
+from OHLC values from a data source. 
+
+Our first data source will be CSV file downloaded from NSE website's live market/EOD for any given
+segment of stocks. This would be used anytime during a trading and immediately after close of trading
+session to do any trades for post market session.
+
+Here, the Last traded Price (LTP) column for a stock will be considered as the Close price to calculate if
+a hammer is formed or not. 
+
+The second data source would be the bhavcopy CSV file from NSE website with settlement/close price. The
+bhavcopy is available for download only after 6:00pm and can be used for analysis to place AMO (After
+Market Orders) for next day's trading session.
+
+
+'''
+import numpy as np
+import pandas as pd
+import configparser
+import sys
+import os
+import datetime
+
+def fileValidityCheck(FILE_NAME, IGNORE=False):
+    '''Checks to see if a file exists. If not, asks user input for a valid name if IGNORE=True.
+        returns a valid filename or None'''
+    while True:
+        if not os.path.exists(FILE_NAME):
+            print('Warning! The file {} does not exist.'.format(FILE_NAME))
+            if IGNORE:
+                return None
+            FILE_NAME = input('Enter fullpath to the CSV file: ')
+            if len(FILE_NAME) == 0:
+                return None
+        else:
+            return FILE_NAME
+
+def getBhavCopyData(index, BHAV):
+    '''Extracts data from Bhav for securities/stocks present in the symbol index given
+       Returns a filtered DataFrame with stocks having Series 'EQ' only'''
+    bhavDF = pd.read_csv(BHAV)
+    bhavDF.set_index('SYMBOL', inplace = True)
+    bhavDF.dropna(axis=1,inplace=True,thresh=1)
+    bhavDF = bhavDF.loc[index]
+    return bhavDF[ bhavDF['SERIES'] == 'EQ' ]
+
+#Load config file. The file config.ini must be in the same folder/directory as this python program
+config = configparser.ConfigParser()
+config.read('config.ini')
+dojiScanner = config['DojiScanner']
+
+#Setting the default CSV filename if not given as CLI argument
+FOLDER_NAME = dojiScanner['foldername'] #Example: data/scanner/
+PREFIX_CSV = dojiScanner['csvfileprefix'] #Example: 'MW-SECURITIES-IN-F&O-'
+today = datetime.date.today().strftime('%d-%b-%Y') #format: 24-MAR-2021. dd-mmm-yyyy
+FILE_NAME = FOLDER_NAME + PREFIX_CSV + today + '.csv'
+
+#Setting the default bhavcopy CSV filename if not given as CLI argument
+BHAV_PREFIX = dojiScanner['bhavPrefix']
+BHAV_SUFFIX = dojiScanner['bhavSuffix']
+today = today.replace('-','').upper() #bhavcopy file has the date in filename format ddmmyyy. Stripping '-'
+BHAV = FOLDER_NAME + BHAV_PREFIX + today + BHAV_SUFFIX + '.csv'
+# print('Debug: BHAV :', BHAV)
+
+#Checking to see if CSV filename given as CLI argument
+if len( sys.argv) > 1:
+    FILE_NAME = FOLDER_NAME + sys.argv[1]
+
+#Checking to see if bhavcopy filename given as CLI argument
+if len(sys.argv) > 2:
+    BHAV = FOLDER_NAME + sys.argv[2]
+
+#Sanity scheck to see of CSV file exists
+print('\nVerifying the live market data CSV file')
+FILE_NAME = fileValidityCheck(FILE_NAME)
+if not FILE_NAME:
+    print('#User input None. Exiting the program..')
+    sys.exit()
+print('Live market data CSV file present: ',FILE_NAME)
+
+#Read CSV file into a dataframe.
+df = pd.read_csv(FILE_NAME,thousands=',') 
+# We need to use thousands=',' parameter as CSV columns have number with comma.
+# Else pandas will treat float numbers as object
+
+#Rename columns to keep it clean. Column names from NSE website has \n and other characters.
+df.columns = ['SYMBOL','OPEN', 'HIGH', 'LOW', 'PREV CLOSE', 'CLOSE', 'CHNG',
+       '%CHNG', 'VOLUME', 'VALUE', '52W H', '52W L',
+       '365 D', '30 D'] #LTP or last traded price column is set as CLOSE
+
+#unwanted columns to drop. We don't need these scanning candidate stocks doji candles
+# cols_to_drop = ['CHNG','VOLUME', 'VALUE', '52W H', '52W L','365 D', '30 D','%CHNG']
+# df.drop(columns = cols_to_drop, inplace = True)
+
+df.set_index('SYMBOL',inplace=True)
+
+#Sanity check to see if Bhavcopy exists. 
+#Will use bhavcopy for analysis if available or provided as user input. Else use the live trade csvfile
+print('\nVerifying the Bhavcopy CSV file for the day')
+BHAV = fileValidityCheck(BHAV,True)
+if BHAV:
+    print('Bhavcopy : {} found! Proceeding with Bhavcopy file for data analysis\n'.format(BHAV))
+    df = getBhavCopyData(df.index,BHAV)
+else:
+    print('No Bhavcopy found! Proceeding with live market data CSV file for data analysis\n')
+
+#First filteration: Eliminate stocks whose prices are lower or upper then a set limits
+LOW_LIMIT = dojiScanner.getint('lowerpricelimit')
+UP_LIMIT = dojiScanner.getint('upperPriceLimit')
+dfToDrop = df[(df['CLOSE'] < LOW_LIMIT) | (df['CLOSE'] > UP_LIMIT)]
+print('Dropping {0} stocks with CLOSE price > {1} or < {2}'.format(len(dfToDrop),UP_LIMIT,LOW_LIMIT))
+df.drop(dfToDrop.index,inplace=True)
+
+#SANITY CHECK. To drop any stocks where high == Low to avoid infinity position size.
+if len(df[df['HIGH']==df['LOW']]) > 0:
+    bad_df = df[ df['HIGH'] == df['LOW'] ]
+    print ('ALERT: {} stock/stocks with HIGH = LOW'.format(len(bad_df)))
+    print( bad_df )
+    for stock in bad_df.index:
+        print('Dropping {} from today\'s list'.format(stock))
+    df.drop(bad_df.index, inplace = True)
+    
+MULTIPLIER = dojiScanner.getfloat('tailtobodyratio')
+print('Minimum Tail/Body Ratio = \'{} : 1\''.format(MULTIPLIER))
+#Both Green (Close>=Open) and Red (OPEN>CLOSE) Dragonfly dojis or hammer candlestick formations
+dragonFlyDf = df[ (
+                    (df['CLOSE'] >= df['OPEN']) 
+                & ( (df['OPEN'] - df['LOW'] ) > ((df['CLOSE'] - df['OPEN']) * MULTIPLIER) )
+                & ( (df['HIGH'] - df['CLOSE']) < (df['CLOSE'] - df['OPEN']) )
+                ) |
+                (
+                    (df['OPEN'] > df['CLOSE']) 
+                & ( (df['CLOSE'] - df['LOW'] ) > ((df['OPEN'] - df['CLOSE']) * MULTIPLIER) )
+                & ( (df['HIGH'] - df['OPEN']) < (df['OPEN'] - df['CLOSE']) )
+                )
+]
+
+if len(dragonFlyDf) > 0:
+    print('{} stocks show Hammer Candlestick pattern'.format(len(dragonFlyDf)))
+    for stock in dragonFlyDf.index:
+        print(stock)
+else:
+    print('No stocks with Hammer pattern')
