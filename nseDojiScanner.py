@@ -22,7 +22,8 @@ import pandas as pd
 import configparser
 import sys
 import os
-import datetime
+# import datetime
+from datetime import timedelta, datetime
 
 def fileValidityCheck(FILE_NAME, IGNORE=False):
     '''Checks to see if a file exists. If not, asks user input for a valid name if IGNORE=True.
@@ -47,15 +48,36 @@ def getBhavCopyData(index, BHAV):
     bhavDF = bhavDF.loc[index]
     return bhavDF[ bhavDF['SERIES'] == 'EQ' ]
 
+def isTradingHoliday(theday,holidayList):
+    '''Checks if the theday date is in HolidayList or if it is a weekend and
+        returns True if it is a trading holiday. Else returns False'''
+    pass
 #Load config file. The file config.ini must be in the same folder/directory as this python program
 config = configparser.ConfigParser()
 config.read('config.ini')
 dojiScanner = config['DojiScanner']
+holidayList = dojiScanner['holidays'].strip().split(',') #List of NSE trading holidays that are on weekday
 
-#Setting the default CSV filename if not given as CLI argument
+#offset value for calculating date. Default is 0 days
+backDate = 0
+
+#Checking for CLI arguments for offset date, if any.
+if len(sys.argv) > 1:
+    if sys.argv[1].upper() == '-D':
+        if len(sys.argv) > 2:
+            if sys.argv[2].isdigit():
+                backDate = int(sys.argv[2])
+            else:
+                backDate = 1
+        else:
+            backDate = 1
+
+delta = timedelta(days = backDate)
+
+#Setting the default CSV filename
 FOLDER_NAME = dojiScanner['foldername'] #Example: data/scanner/
 PREFIX_CSV = dojiScanner['csvfileprefix'] #Example: 'MW-SECURITIES-IN-F&O-'
-today = datetime.date.today().strftime('%d-%b-%Y') #format: 24-MAR-2021. dd-mmm-yyyy
+today = (datetime.today() - delta).strftime('%d-%b-%Y') #format: 24-Mar-2021. dd-mmm-yyyy
 FILE_NAME = FOLDER_NAME + PREFIX_CSV + today + '.csv'
 
 #Setting the default bhavcopy CSV filename if not given as CLI argument
@@ -64,14 +86,6 @@ BHAV_SUFFIX = dojiScanner['bhavSuffix']
 today = today.replace('-','').upper() #bhavcopy file has the date in filename format ddmmyyy. Stripping '-'
 BHAV = FOLDER_NAME + BHAV_PREFIX + today + BHAV_SUFFIX + '.csv'
 # print('Debug: BHAV :', BHAV)
-
-#Checking to see if CSV filename given as CLI argument
-if len( sys.argv) > 1:
-    FILE_NAME = FOLDER_NAME + sys.argv[1]
-
-#Checking to see if bhavcopy filename given as CLI argument
-if len(sys.argv) > 2:
-    BHAV = FOLDER_NAME + sys.argv[2]
 
 #Sanity scheck to see of CSV file exists
 print('\nVerifying the live market data CSV file')
@@ -124,7 +138,7 @@ if len(df[df['HIGH']==df['LOW']]) > 0:
     df.drop(bad_df.index, inplace = True)
     
 MULTIPLIER = dojiScanner.getfloat('tailtobodyratio')
-print('Minimum Tail/Body Ratio = \'{} : 1\''.format(MULTIPLIER))
+print('\nMinimum Tail/Body Ratio = \'{} : 1\''.format(MULTIPLIER))
 #Both Green (Close>=Open) and Red (OPEN>CLOSE) Dragonfly dojis or hammer candlestick formations
 dragonFlyDf = df[ (
                     (df['CLOSE'] >= df['OPEN']) 
@@ -139,8 +153,8 @@ dragonFlyDf = df[ (
 ]
 
 if len(dragonFlyDf) > 0:
-    print('{} stocks show Hammer Candlestick pattern'.format(len(dragonFlyDf)))
+    print('\n{} stocks show Hammer Candlestick pattern'.format(len(dragonFlyDf)))
     for stock in dragonFlyDf.index:
         print(stock)
 else:
-    print('No stocks with Hammer pattern')
+    print('\nNo stocks with Hammer pattern')
