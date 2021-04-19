@@ -92,17 +92,18 @@ theDay = datetime.today() - delta
 if isTradingHoliday(theDay,holidayList):
     print('The given date\'{}\' is a trading holiday/weekend. Select another date'.format(theDay.strftime('%d-%b-%Y')))
     sys.exit()
+
 today = theDay.strftime('%d-%b-%Y') #format: 24-Mar-2021. dd-mmm-yyyy
 FILE_NAME = FOLDER_NAME + PREFIX_CSV + today + '.csv'
 
-#Setting the default bhavcopy CSV filename if not given as CLI argument
+#Setting the latest bhavcopy CSV filename
 BHAV_PREFIX = dojiScanner['bhavPrefix']
 BHAV_SUFFIX = dojiScanner['bhavSuffix']
 today = today.replace('-','').upper() #bhavcopy file has the date in filename format ddmmyyy. Stripping '-'
 BHAV = FOLDER_NAME + BHAV_PREFIX + today + BHAV_SUFFIX + '.csv'
 # print('Debug: BHAV :', BHAV)
 
-#Sanity scheck to see of CSV file exists
+#Sanity check to see of live market segment CSV file exists
 print('\nVerifying the live market data CSV file')
 FILE_NAME = fileValidityCheck(FILE_NAME)
 if not FILE_NAME:
@@ -113,21 +114,17 @@ print('Live market data CSV file present: ',FILE_NAME)
 #Read CSV file into a dataframe.
 df = pd.read_csv(FILE_NAME,thousands=',') 
 # We need to use thousands=',' parameter as CSV columns have number with comma.
-# Else pandas will treat float numbers as object
+# Else pandas will treat the price (float) values as object
 
 #Rename columns to keep it clean. Column names from NSE website has \n and other characters.
 df.columns = ['SYMBOL','OPEN', 'HIGH', 'LOW', 'PREV CLOSE', 'CLOSE', 'CHNG',
        '%CHNG', 'VOLUME', 'VALUE', '52W H', '52W L',
        '365 D', '30 D'] #LTP or last traded price column is set as CLOSE
 
-#unwanted columns to drop. We don't need these scanning candidate stocks doji candles
-# cols_to_drop = ['CHNG','VOLUME', 'VALUE', '52W H', '52W L','365 D', '30 D','%CHNG']
-# df.drop(columns = cols_to_drop, inplace = True)
-
 df.set_index('SYMBOL',inplace=True)
 
-#Sanity check to see if Bhavcopy exists. 
-#Will use bhavcopy for analysis if available or provided as user input. Else use the live trade csvfile
+#Sanity check to see if latest Bhavcopy exists. 
+#Will use bhavcopy for analysis if available. Else use the live trade csvfile
 print('\nVerifying the Bhavcopy CSV file for the day')
 BHAV = fileValidityCheck(BHAV,True)
 if BHAV:
@@ -136,7 +133,7 @@ if BHAV:
 else:
     print('No Bhavcopy found! Proceeding with live market data CSV file for data analysis\n')
 
-#First filteration: Eliminate stocks whose prices are lower or upper then a set limits
+#First filteration: Eliminate stocks whose prices are lower or upper than the set price band
 LOW_LIMIT = dojiScanner.getint('lowerpricelimit')
 UP_LIMIT = dojiScanner.getint('upperPriceLimit')
 dfToDrop = df[(df['CLOSE'] < LOW_LIMIT) | (df['CLOSE'] > UP_LIMIT)]
