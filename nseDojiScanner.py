@@ -86,9 +86,14 @@ def getBullishHammer(df, MULTIPLIER=3):
             ]
     
 
-def getBullishMarubozu():
+def getBullishMarubozu(bhavcopyDF, SHADOW_RATIO = 0.07):
     '''Gets stocks that are forming Bullish Marubozu pattern'''
-    pass
+    print('\nMarubozu Shadow to body ratio :',SHADOW_RATIO)
+    return bhavcopyDF.loc[
+     ( bhavcopyDF['CLOSE'] > bhavcopyDF['OPEN'] ) &
+     ((( bhavcopyDF['HIGH'] - bhavcopyDF['CLOSE'] ) / ( bhavcopyDF['CLOSE'] - bhavcopyDF['OPEN'] )) < SHADOW_RATIO ) &
+     ((( bhavcopyDF['OPEN'] - bhavcopyDF['LOW'] ) / ( bhavcopyDF['CLOSE'] - bhavcopyDF['OPEN'] )) < SHADOW_RATIO )
+    ]
 
 def getBullishEngulfing():
     '''Gets stocks that are forming Bullish Engulfing pattern'''
@@ -191,6 +196,16 @@ if len(dragonFlyDf) > 0:
 else:
     print('\nNo stocks with Hammer pattern')
 
+#Bullish Marubozu Pattern
+MARUBOZU_WICK_RATIO = dojiScanner.getfloat('marubozuShadow')
+marubozuDF = getBullishMarubozu(df, MARUBOZU_WICK_RATIO)
+if len(marubozuDF) > 0:
+    print('\n{} stocks show Bullish Marubozu Candlestock pattern'.format(len(marubozuDF)))
+    for stock in marubozuDF.index:
+        print(stock)
+else:
+    print('\nNo stocks with Bullish Marubozu pattern')
+
 #Bullish Engulfing Pattern
 prevday = getPrevTradingDay(theDay - timedelta(days=1),holidayList)
-print('#Debug: Previous Trading day is', prevday)
+print('\n#Debug: Previous Trading day is', prevday)
