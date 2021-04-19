@@ -48,10 +48,19 @@ def getBhavCopyData(index, BHAV):
     bhavDF = bhavDF.loc[index]
     return bhavDF[ bhavDF['SERIES'] == 'EQ' ]
 
-def isTradingHoliday(theday,holidayList):
+def isTradingHoliday(theDay,holidayList):
     '''Checks if the theday date is in HolidayList or if it is a weekend and
         returns True if it is a trading holiday. Else returns False'''
-    pass
+    if theDay.weekday() > 4: #is it a weekend (>4)
+        print('{} is a weekend'.format(theDay.strftime('%A, %d %b %Y,')))
+        return True
+    theKeyDay = theDay.strftime('%d-%b-%Y')
+    if theKeyDay in holidayList:
+        print(theKeyDay,'is a trading holiday')
+        return True
+    else:
+        return False
+
 #Load config file. The file config.ini must be in the same folder/directory as this python program
 config = configparser.ConfigParser()
 config.read('config.ini')
@@ -77,7 +86,13 @@ delta = timedelta(days = backDate)
 #Setting the default CSV filename
 FOLDER_NAME = dojiScanner['foldername'] #Example: data/scanner/
 PREFIX_CSV = dojiScanner['csvfileprefix'] #Example: 'MW-SECURITIES-IN-F&O-'
-today = (datetime.today() - delta).strftime('%d-%b-%Y') #format: 24-Mar-2021. dd-mmm-yyyy
+theDay = datetime.today() - delta
+
+#sanity check to see if the given date is a trading holiday/weekend
+if isTradingHoliday(theDay,holidayList):
+    print('The given date\'{}\' is a trading holiday/weekend. Select another date'.format(theDay.strftime('%d-%b-%Y')))
+    sys.exit()
+today = theDay.strftime('%d-%b-%Y') #format: 24-Mar-2021. dd-mmm-yyyy
 FILE_NAME = FOLDER_NAME + PREFIX_CSV + today + '.csv'
 
 #Setting the default bhavcopy CSV filename if not given as CLI argument
