@@ -61,6 +61,39 @@ def isTradingHoliday(theDay,holidayList):
     else:
         return False
 
+def getPrevTradingDay(yesterday,holidayList):
+    '''Checks if yesterday is a trading day or not. 
+    Returns the valid previous trading day as a string of format ddMMMyyyy'''
+    while(isTradingHoliday(yesterday,holidayList)):
+        yesterday = yesterday - timedelta(days=1)
+    return yesterday.strftime('%d%b%Y').upper()
+
+def getBullishHammer(df, MULTIPLIER=3):
+    '''Gets stocks that are forming Bullish Hammer pattern. Returns a DataFrame
+    containing stocks which form a bullish Hammer pattern with Multiplier as the 'tail : body' ratio'''
+    print('\nMinimum Tail/Body Ratio = \'{} : 1\''.format(MULTIPLIER))
+    #Both Green (Close>=Open) and Red (OPEN>CLOSE) Dragonfly dojis or hammer candlestick formations
+    return df[ (
+                    (df['CLOSE'] >= df['OPEN']) 
+                & ( (df['OPEN'] - df['LOW'] ) > ((df['CLOSE'] - df['OPEN']) * MULTIPLIER) )
+                & ( (df['HIGH'] - df['CLOSE']) < (df['CLOSE'] - df['OPEN']) )
+                ) |
+                (
+                    (df['OPEN'] > df['CLOSE']) 
+                & ( (df['CLOSE'] - df['LOW'] ) > ((df['OPEN'] - df['CLOSE']) * MULTIPLIER) )
+                & ( (df['HIGH'] - df['OPEN']) < (df['OPEN'] - df['CLOSE']) )
+                )
+            ]
+    
+
+def getBullishMarubozu():
+    '''Gets stocks that are forming Bullish Marubozu pattern'''
+    pass
+
+def getBullishEngulfing():
+    '''Gets stocks that are forming Bullish Engulfing pattern'''
+    pass
+
 #Load config file. The file config.ini must be in the same folder/directory as this python program
 config = configparser.ConfigParser()
 config.read('config.ini')
@@ -150,23 +183,14 @@ if len(df[df['HIGH']==df['LOW']]) > 0:
     df.drop(bad_df.index, inplace = True)
     
 MULTIPLIER = dojiScanner.getfloat('tailtobodyratio')
-print('\nMinimum Tail/Body Ratio = \'{} : 1\''.format(MULTIPLIER))
-#Both Green (Close>=Open) and Red (OPEN>CLOSE) Dragonfly dojis or hammer candlestick formations
-dragonFlyDf = df[ (
-                    (df['CLOSE'] >= df['OPEN']) 
-                & ( (df['OPEN'] - df['LOW'] ) > ((df['CLOSE'] - df['OPEN']) * MULTIPLIER) )
-                & ( (df['HIGH'] - df['CLOSE']) < (df['CLOSE'] - df['OPEN']) )
-                ) |
-                (
-                    (df['OPEN'] > df['CLOSE']) 
-                & ( (df['CLOSE'] - df['LOW'] ) > ((df['OPEN'] - df['CLOSE']) * MULTIPLIER) )
-                & ( (df['HIGH'] - df['OPEN']) < (df['OPEN'] - df['CLOSE']) )
-                )
-]
-
+dragonFlyDf = getBullishHammer(df,MULTIPLIER)
 if len(dragonFlyDf) > 0:
     print('\n{} stocks show Hammer Candlestick pattern'.format(len(dragonFlyDf)))
     for stock in dragonFlyDf.index:
         print(stock)
 else:
     print('\nNo stocks with Hammer pattern')
+
+#Bullish Engulfing Pattern
+prevday = getPrevTradingDay(theDay - timedelta(days=1),holidayList)
+print('#Debug: Previous Trading day is', prevday)
