@@ -95,9 +95,28 @@ def getBullishMarubozu(bhavcopyDF, SHADOW_RATIO = 0.07):
      ((( bhavcopyDF['OPEN'] - bhavcopyDF['LOW'] ) / ( bhavcopyDF['CLOSE'] - bhavcopyDF['OPEN'] )) < SHADOW_RATIO )
     ]
 
-def getBullishEngulfing():
+def getBullishEngulfing(bhavcopyDF,prevBhavFile):
     '''Gets stocks that are forming Bullish Engulfing pattern'''
-    pass
+    prevBhavFile = fileValidityCheck(prevBhavFile)
+    if not prevBhavFile:
+        print('\nPrevious trading day data file not found. Cannot Create Engulfing pattern')
+        return pd.DataFrame()
+    print('\nPrevious day bhavcopy found:', prevBhavFile)
+    prevDayBhavDF = getBhavCopyData(df.index, prevBhavFile)
+    bhavcopyDF['PREVOPEN'] = prevDayBhavDF['OPEN']
+    return bhavcopyDF.loc[
+            ( ( bhavcopyDF['PREVOPEN'] > bhavcopyDF['PREVCLOSE'] ) & ( bhavcopyDF['CLOSE'] > bhavcopyDF['OPEN'] ) ) &
+            ( ( bhavcopyDF['OPEN'] < bhavcopyDF['PREVCLOSE'] ) & ( bhavcopyDF['CLOSE'] > bhavcopyDF['PREVOPEN'] ) ),
+            ['OPEN','PREVCLOSE','CLOSE','PREVOPEN']
+        ]
+
+def getBullishHarami(bhavcopyDF):
+    '''Gets stocks that are forming Bullish Harami pattern'''
+    return bhavcopyDF.loc[
+        ( ( bhavcopyDF['PREVOPEN'] > bhavcopyDF['PREVCLOSE'] ) & ( bhavcopyDF['CLOSE'] > bhavcopyDF['OPEN'] ) ) &
+        ( ( bhavcopyDF['OPEN'] > bhavcopyDF['PREVCLOSE'] ) & ( bhavcopyDF['CLOSE'] < bhavcopyDF['PREVOPEN'] ) ),
+        ['OPEN','PREVCLOSE','CLOSE','PREVOPEN']
+    ]
 
 #Load config file. The file config.ini must be in the same folder/directory as this python program
 config = configparser.ConfigParser()
@@ -155,7 +174,7 @@ df = pd.read_csv(FILE_NAME,thousands=',')
 # Else pandas will treat the price (float) values as object
 
 #Rename columns to keep it clean. Column names from NSE website has \n and other characters.
-df.columns = ['SYMBOL','OPEN', 'HIGH', 'LOW', 'PREV CLOSE', 'CLOSE', 'CHNG',
+df.columns = ['SYMBOL','OPEN', 'HIGH', 'LOW', 'PREVCLOSE', 'CLOSE', 'CHNG',
        '%CHNG', 'VOLUME', 'VALUE', '52W H', '52W L',
        '365 D', '30 D'] #LTP or last traded price column is set as CLOSE
 
@@ -200,12 +219,34 @@ else:
 MARUBOZU_WICK_RATIO = dojiScanner.getfloat('marubozuShadow')
 marubozuDF = getBullishMarubozu(df, MARUBOZU_WICK_RATIO)
 if len(marubozuDF) > 0:
-    print('\n{} stocks show Bullish Marubozu Candlestock pattern'.format(len(marubozuDF)))
+    print('\n{} stocks show Bullish Marubozu Candlestick pattern'.format(len(marubozuDF)))
     for stock in marubozuDF.index:
         print(stock)
 else:
     print('\nNo stocks with Bullish Marubozu pattern')
 
 #Bullish Engulfing Pattern
-prevday = getPrevTradingDay(theDay - timedelta(days=1),holidayList)
-print('\n#Debug: Previous Trading day is', prevday)
+print('\nLooking for Bullish Engulfing pattern...')
+prevDay = getPrevTradingDay(theDay - timedelta(days=1),holidayList)
+print('\nPrevious Trading day is', prevDay)
+prevBhavFile = FOLDER_NAME + BHAV_PREFIX + prevDay + BHAV_SUFFIX + '.csv'
+engulfingDF = getBullishEngulfing(df,prevBhavFile)
+if len(engulfingDF) > 0:
+    print('\n{} stocks show Bullish Engulfing Candlestick pattern'.format(len(engulfingDF)))
+    for stock in engulfingDF.index:
+        print(stock)
+else:
+    print('\nNo stocks with Bullish Engulfing pattern')
+
+#Bullish Harami Pattern
+print('\nLooking for Bullish Harami pattern...')
+if not fileValidityCheck(prevBhavFile):
+    print('Previous day bhavcopy not found. Hence cannot find the bullish harami pattern')
+else:
+    haramiDF = getBullishHarami(df)
+    if not haramiDF.empty:
+        print('\n{} stocks show Bullish Harami Candlestick pattern'.format(len(haramiDF)))
+        for stock in haramiDF.index:
+            print(stock)
+    else:
+        print('\nNo stocks with Bullish Harami pattern')
