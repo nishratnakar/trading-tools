@@ -22,17 +22,19 @@ import pandas as pd
 import configparser
 import sys
 import os
-# import datetime
 from datetime import timedelta, datetime
+import getMarketData
+import urllib3
+urllib3.disable_warnings()
 
 def fileValidityCheck(FILE_NAME, IGNORE=False):
     '''Checks to see if a file exists. If not, asks user input for a valid name if IGNORE=True.
         returns a valid filename or None'''
     while True:
         if not os.path.exists(FILE_NAME):
-            print('Warning! The file {} does not exist.'.format(FILE_NAME))
             if IGNORE:
                 return None
+            print('Warning! The file {} does not exist.'.format(FILE_NAME))
             FILE_NAME = input('Enter fullpath to the CSV file: ')
             if len(FILE_NAME) == 0:
                 return None
@@ -180,6 +182,15 @@ df.columns = ['SYMBOL','OPEN', 'HIGH', 'LOW', 'PREVCLOSE', 'CLOSE', 'CHNG',
 
 df.set_index('SYMBOL',inplace=True)
 
+now = datetime.now()
+# print('#Debug:now:',now)
+# print('#Debug:now:',now.hour)
+# print('#Debug:theDay',theDay)
+# print('Debug: now.day == theDay.day', now.day == theDay.day)
+if ((now.day == theDay.day) and ( now.hour > 18 )) or now.day > theDay.day:
+    status = getMarketData.fetchBhavcopy(today,FOLDER_NAME,BHAV)
+if status:
+    print('Bhavcopy fetched successfully for date:',today)
 #Sanity check to see if latest Bhavcopy exists. 
 #Will use bhavcopy for analysis if available. Else use the live trade csvfile
 print('\nVerifying the Bhavcopy CSV file for the day')
@@ -230,6 +241,9 @@ print('\nLooking for Bullish Engulfing pattern...')
 prevDay = getPrevTradingDay(theDay - timedelta(days=1),holidayList)
 print('\nPrevious Trading day is', prevDay)
 prevBhavFile = FOLDER_NAME + BHAV_PREFIX + prevDay + BHAV_SUFFIX + '.csv'
+status = getMarketData.fetchBhavcopy(prevDay,FOLDER_NAME, prevBhavFile)
+if status:
+    print('Bhavcopy fetched successfully for date:',prevDay)
 engulfingDF = getBullishEngulfing(df,prevBhavFile)
 if len(engulfingDF) > 0:
     print('\n{} stocks show Bullish Engulfing Candlestick pattern'.format(len(engulfingDF)))
