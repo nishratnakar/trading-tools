@@ -187,7 +187,8 @@ now = datetime.now()
 # print('#Debug:now:',now.hour)
 # print('#Debug:theDay',theDay)
 # print('Debug: now.day == theDay.day', now.day == theDay.day)
-if ((now.day == theDay.day) and ( now.hour > 18 )) or now.day > theDay.day:
+status = False
+if ((now.day == theDay.day) and ( now.hour >= 18 )) or now.day > theDay.day:
     status = getMarketData.fetchBhavcopy(today,FOLDER_NAME,BHAV)
 if status:
     print('Bhavcopy fetched successfully for date:',today)
