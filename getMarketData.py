@@ -45,8 +45,8 @@ def downloadUnzip(url,filepath):
         print('File Decompression Success!')
         print('Uncompressed File path:',filepath)
         os.remove(zFilePath)
-    else:
-        print('File already exists:',filepath)
+    # else:
+    #     print('File already exists:',filepath)
     return True
 
 
@@ -78,14 +78,9 @@ def main(offset=0):
     delta = timedelta(days = offset)
     FOLDER_NAME = 'data/scanner/' #The location where files will be downloaded
     bhavDay = (datetime.today() - delta).strftime('%d%b%Y').upper() #Needs to be a valid trading day
-    year = bhavDay[5:]
-    month = bhavDay[2:5]
-#     print('#Debug:',year , month , bhavDay)
     bhavFileName = 'cm'+bhavDay+'bhav.csv'
-#     print('#Debug: bhavFileName:',bhavFileName)
     bhavFilePath = os.path.join(FOLDER_NAME,bhavFileName)
     bhavFilePath
-#     print('#Debug: bhavFilePath:',bhavFilePath)
     status = fetchBhavcopy(bhavDay, FOLDER_NAME, bhavFilePath)
     if status == False:
         print('Fetching of bhavcopy failed for date:',bhavDay)

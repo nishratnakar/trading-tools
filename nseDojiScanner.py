@@ -73,7 +73,9 @@ def getPrevTradingDay(yesterday,holidayList):
 def getBullishHammer(df, MULTIPLIER=3):
     '''Gets stocks that are forming Bullish Hammer pattern. Returns a DataFrame
     containing stocks which form a bullish Hammer pattern with Multiplier as the 'tail : body' ratio'''
-    print('\nMinimum Tail/Body Ratio = \'{} : 1\''.format(MULTIPLIER))
+    print('\nBULLISH HAMMER CANDLESTICK SCAN')
+    print('-------------------------------')
+    print('Minimum Tail/Body Ratio = \'{} : 1\''.format(MULTIPLIER))
     #Both Green (Close>=Open) and Red (OPEN>CLOSE) Dragonfly dojis or hammer candlestick formations
     return df[ (
                     (df['CLOSE'] >= df['OPEN']) 
@@ -90,6 +92,8 @@ def getBullishHammer(df, MULTIPLIER=3):
 
 def getBullishMarubozu(bhavcopyDF, SHADOW_RATIO = 0.07):
     '''Gets stocks that are forming Bullish Marubozu pattern'''
+    print('\nBULLISH MARUBOZU CANDLESTICK SCAN')
+    print('---------------------------------')
     print('\nMarubozu Shadow to body ratio :',SHADOW_RATIO)
     return bhavcopyDF.loc[
      ( bhavcopyDF['CLOSE'] > bhavcopyDF['OPEN'] ) &
@@ -99,6 +103,8 @@ def getBullishMarubozu(bhavcopyDF, SHADOW_RATIO = 0.07):
 
 def getBullishEngulfing(bhavcopyDF,prevBhavFile):
     '''Gets stocks that are forming Bullish Engulfing pattern'''
+    print('\nBULLISH ENGULFING CANDLESTICK SCAN')
+    print('----------------------------------')
     prevBhavFile = fileValidityCheck(prevBhavFile)
     if not prevBhavFile:
         print('\nPrevious trading day data file not found. Cannot Create Engulfing pattern')
@@ -114,6 +120,8 @@ def getBullishEngulfing(bhavcopyDF,prevBhavFile):
 
 def getBullishHarami(bhavcopyDF):
     '''Gets stocks that are forming Bullish Harami pattern'''
+    print('\nBULLISH HARAMI CANDLESTICK SCAN')
+    print('-------------------------------')
     return bhavcopyDF.loc[
         ( ( bhavcopyDF['PREVOPEN'] > bhavcopyDF['PREVCLOSE'] ) & ( bhavcopyDF['CLOSE'] > bhavcopyDF['OPEN'] ) ) &
         ( ( bhavcopyDF['OPEN'] > bhavcopyDF['PREVCLOSE'] ) & ( bhavcopyDF['CLOSE'] < bhavcopyDF['PREVOPEN'] ) ),
@@ -172,8 +180,6 @@ print('Live market data CSV file present: ',FILE_NAME)
 
 #Read CSV file into a dataframe.
 df = pd.read_csv(FILE_NAME,thousands=',') 
-# We need to use thousands=',' parameter as CSV columns have number with comma.
-# Else pandas will treat the price (float) values as object
 
 #Rename columns to keep it clean. Column names from NSE website has \n and other characters.
 df.columns = ['SYMBOL','OPEN', 'HIGH', 'LOW', 'PREVCLOSE', 'CLOSE', 'CHNG',
@@ -183,30 +189,24 @@ df.columns = ['SYMBOL','OPEN', 'HIGH', 'LOW', 'PREVCLOSE', 'CLOSE', 'CHNG',
 df.set_index('SYMBOL',inplace=True)
 
 now = datetime.now()
-# print('#Debug:now:',now)
-# print('#Debug:now:',now.hour)
-# print('#Debug:theDay',theDay)
-# print('Debug: now.day == theDay.day', now.day == theDay.day)
-status = False
+# if the day to fetch data is current day and time is greater than or equal to 6:00pm,
+# or if the day to fetch data is prior to current trading day , only then bhavcopy is available
+found = False
 if ((now.day == theDay.day) and ( now.hour >= 18 )) or now.day > theDay.day:
-    status = getMarketData.fetchBhavcopy(today,FOLDER_NAME,BHAV)
-if status:
+    found = getMarketData.fetchBhavcopy(today,FOLDER_NAME,BHAV)
+
+if found:#Will use bhavcopy for analysis if available.
     print('Bhavcopy fetched successfully for date:',today)
-#Sanity check to see if latest Bhavcopy exists. 
-#Will use bhavcopy for analysis if available. Else use the live trade csvfile
-print('\nVerifying the Bhavcopy CSV file for the day')
-BHAV = fileValidityCheck(BHAV,True)
-if BHAV:
-    print('Bhavcopy : {} found! Proceeding with Bhavcopy file for data analysis\n'.format(BHAV))
+    # print('Proceeding with Bhavcopy file \'{}\' for data analysis\n'.format(BHAV))
     df = getBhavCopyData(df.index,BHAV)
-else:
+else:#Else use the live trade csvfile
     print('No Bhavcopy found! Proceeding with live market data CSV file for data analysis\n')
 
 #First filteration: Eliminate stocks whose prices are lower or upper than the set price band
 LOW_LIMIT = dojiScanner.getint('lowerpricelimit')
 UP_LIMIT = dojiScanner.getint('upperPriceLimit')
 dfToDrop = df[(df['CLOSE'] < LOW_LIMIT) | (df['CLOSE'] > UP_LIMIT)]
-print('Dropping {0} stocks with CLOSE price > {1} or < {2}'.format(len(dfToDrop),UP_LIMIT,LOW_LIMIT))
+print('\nDropping {0} stocks with CLOSE price > {1} or < {2}'.format(len(dfToDrop),UP_LIMIT,LOW_LIMIT))
 df.drop(dfToDrop.index,inplace=True)
 
 #SANITY CHECK. To drop any stocks where high == Low to avoid infinity position size.
@@ -238,23 +238,24 @@ else:
     print('\nNo stocks with Bullish Marubozu pattern')
 
 #Bullish Engulfing Pattern
-print('\nLooking for Bullish Engulfing pattern...')
 prevDay = getPrevTradingDay(theDay - timedelta(days=1),holidayList)
-print('\nPrevious Trading day is', prevDay)
+# print('\nPrevious Trading day is', prevDay)
 prevBhavFile = FOLDER_NAME + BHAV_PREFIX + prevDay + BHAV_SUFFIX + '.csv'
-status = getMarketData.fetchBhavcopy(prevDay,FOLDER_NAME, prevBhavFile)
-if status:
-    print('Bhavcopy fetched successfully for date:',prevDay)
-engulfingDF = getBullishEngulfing(df,prevBhavFile)
-if len(engulfingDF) > 0:
-    print('\n{} stocks show Bullish Engulfing Candlestick pattern'.format(len(engulfingDF)))
-    for stock in engulfingDF.index:
-        print(stock)
+found = getMarketData.fetchBhavcopy(prevDay,FOLDER_NAME, prevBhavFile)
+if found:
+    # print('Bhavcopy fetched successfully for date:',prevDay)
+    engulfingDF = getBullishEngulfing(df,prevBhavFile)
+    if len(engulfingDF) > 0:
+        print('\n{} stocks show Bullish Engulfing Candlestick pattern'.format(len(engulfingDF)))
+        for stock in engulfingDF.index:
+            print(stock)
+    else:
+        print('\nNo stocks with Bullish Engulfing pattern')
 else:
-    print('\nNo stocks with Bullish Engulfing pattern')
+    print('Warning!No Bhavcopy found for previous trading day:{}'.format(prevDay))
+    print('Skipping Bullish Engulfing scan')
 
 #Bullish Harami Pattern
-print('\nLooking for Bullish Harami pattern...')
 if not fileValidityCheck(prevBhavFile):
     print('Previous day bhavcopy not found. Hence cannot find the bullish harami pattern')
 else:
