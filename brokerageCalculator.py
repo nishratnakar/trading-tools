@@ -246,7 +246,7 @@ taxnCharges = brokerage + STT + transCharges + GST + sebiCharges + stampDuty
 
 # In[150]:
 
-print('Gross PL:',round((sell-buy)*qty),2)
+print('Gross PL:',round((sell-buy)*qty, 2))
 print('Total Tax and Transaction Charges',taxnCharges)
 dpCharges = getDPCharges(buyDate, sellDate)
 if dpCharges > 0:
