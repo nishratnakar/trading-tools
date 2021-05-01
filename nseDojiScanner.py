@@ -160,14 +160,14 @@ if isTradingHoliday(theDay,holidayList):
     print('The given date\'{}\' is a trading holiday/weekend. Select another date'.format(theDay.strftime('%d-%b-%Y')))
     sys.exit()
 
-today = theDay.strftime('%d-%b-%Y') #format: 24-Mar-2021. dd-mmm-yyyy
-FILE_NAME = FOLDER_NAME + PREFIX_CSV + today + '.csv'
+theDayStr = theDay.strftime('%d-%b-%Y') #format: 24-Mar-2021. dd-mmm-yyyy
+FILE_NAME = FOLDER_NAME + PREFIX_CSV + theDayStr + '.csv'
 
 #Setting the latest bhavcopy CSV filename
 BHAV_PREFIX = dojiScanner['bhavPrefix']
 BHAV_SUFFIX = dojiScanner['bhavSuffix']
-today = today.replace('-','').upper() #bhavcopy file has the date in filename format ddmmyyy. Stripping '-'
-BHAV = FOLDER_NAME + BHAV_PREFIX + today + BHAV_SUFFIX + '.csv'
+theDayStr = theDayStr.replace('-','').upper() #bhavcopy file has the date in filename format ddmmyyy. Stripping '-'
+BHAV = FOLDER_NAME + BHAV_PREFIX + theDayStr + BHAV_SUFFIX + '.csv'
 # print('Debug: BHAV :', BHAV)
 
 #Sanity check to see of live market segment CSV file exists
@@ -189,14 +189,21 @@ df.columns = ['SYMBOL','OPEN', 'HIGH', 'LOW', 'PREVCLOSE', 'CLOSE', 'CHNG',
 df.set_index('SYMBOL',inplace=True)
 
 now = datetime.now()
+today = datetime(year=now.year,month=now.month,day=now.day)
+theDay = datetime(theDay.year, theDay.month, theDay.day)
+# print('#Debug: now:',now)
+# print('#Debug: today:',today)
+# print('#Debug: theDay:',theDay)
+# print('#Debug: today == theDay',(today == theDay))
+# print('#Debug: today > theDay',(today > theDay))
 # if the day to fetch data is current day and time is greater than or equal to 6:00pm,
 # or if the day to fetch data is prior to current trading day , only then bhavcopy is available
 found = False
-if ((now.day == theDay.day) and ( now.hour >= 18 )) or now.day > theDay.day:
-    found = getMarketData.fetchBhavcopy(today,FOLDER_NAME,BHAV)
+if ((today == theDay) and ( now.hour >= 18 )) or today > theDay:
+    found = getMarketData.fetchBhavcopy(theDayStr,FOLDER_NAME,BHAV)
 
 if found:#Will use bhavcopy for analysis if available.
-    print('Bhavcopy fetched successfully for date:',today)
+    print('Bhavcopy fetched successfully for date:',theDayStr)
     # print('Proceeding with Bhavcopy file \'{}\' for data analysis\n'.format(BHAV))
     df = getBhavCopyData(df.index,BHAV)
 else:#Else use the live trade csvfile
