@@ -247,10 +247,11 @@ taxnCharges = brokerage + STT + transCharges + GST + sebiCharges + stampDuty
 # In[150]:
 
 print('Gross PL:',round((sell-buy)*qty, 2))
-print('Total Tax and Transaction Charges',taxnCharges)
+print('Total Tax and Transaction Charges',round(taxnCharges,2))
 dpCharges = getDPCharges(buyDate, sellDate)
 if dpCharges > 0:
     print('DP charges:',dpCharges)
+    print(f'Total Charges: {taxnCharges + dpCharges}')
 netPL = getNetPL(buy,sell,qty,taxnCharges) - dpCharges
 print('Net PL:',round(netPL,2))
 
