@@ -44,6 +44,8 @@ def getBrokerage(buy, sell, qty, delta=timedelta(days=0)):
 def getSTT(buy, sell, qty, delta=timedelta(days=0)):
     '''Security Transaction Tax: 
     (Delivery)0.1% on buy & sell. 
+    (Delivery equity ETF) STT is only applicable for Equity Oriented Funds on the sell side at a rate of 0.001%
+    It is not applicable to debt (Liquid/Gilt), commodity (Gold) and International ETFs (N100).
     (Intraday)0.025% on the sell side'''
     #Need to add logic for ETFs
     if delta < timedelta(days = 1):
