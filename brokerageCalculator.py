@@ -41,15 +41,17 @@ def getBrokerage(buy, sell, qty, delta=timedelta(days=0)):
 # In[155]:
 
 
-def getSTT(buy, sell, qty, delta=timedelta(days=0)):
+def getSTT(buy, sell, qty, delta = timedelta(days=0), isETF = False):
     '''Security Transaction Tax: 
     (Delivery)0.1% on buy & sell. 
     (Delivery equity ETF) STT is only applicable for Equity Oriented Funds on the sell side at a rate of 0.001%
     It is not applicable to debt (Liquid/Gilt), commodity (Gold) and International ETFs (N100).
     (Intraday)0.025% on the sell side'''
-    #Need to add logic for ETFs
+    #Need to add logic for ETFs    
     if delta < timedelta(days = 1):
         return round (0.025 / 100 * (sell * qty))
+    elif isETF:
+        return round (0.001 / 100 * (sell * qty),2)
     else:
         return round (0.1 / 100 * getTurnover(buy,sell,qty))
 
@@ -128,6 +130,8 @@ sellDate = None
 buy = 0
 sell = 0
 qty = 0
+isETF = False
+noSTT = False
 if len(sys.argv) > 1:
     buyDate = datetime.strptime(sys.argv[1],'%d-%m-%Y')
 if len(sys.argv) > 2:
@@ -138,6 +142,12 @@ if len(sys.argv) > 4:
     sell = float(sys.argv[4])
 if len(sys.argv) > 5:
     qty = int(sys.argv[5])
+if len(sys.argv) > 6:
+    if sys.argv[6].upper() == 'ETF':
+        isETF = True
+    elif sys.argv[6].upper() == 'NA':
+        noSTT = True
+
 
 # In[133]:
 
@@ -207,8 +217,9 @@ print('Brokerage:',brokerage)
 
 # In[141]:
 
-
-STT = getSTT(buy,sell,qty,delta)
+STT = 0
+if noSTT == False:
+    STT = getSTT(buy, sell, qty, delta, isETF)
 print('STT:',STT)
 
 
