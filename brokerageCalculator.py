@@ -101,7 +101,7 @@ def getDPCharges(buyDate,sellDate):
     if (sellDate - buyDate) <= timedelta(days = 1):
         return 0
     else: #Need to add logic of previous trading day holiday/weekend for BTST
-        return 13.5 + (18 / 100 * 13.5 )
+        return round(13.5 + (18 / 100 * 13.5 ), 2)
 
 
 # In[161]:
@@ -255,7 +255,7 @@ print('Stamp Duty:',stampDuty)
 
 
 taxnCharges = brokerage + STT + transCharges + GST + sebiCharges + stampDuty
-
+taxnCharges = round(taxnCharges,2)
 
 # In[150]:
 
@@ -264,7 +264,7 @@ print('Total Tax and Transaction Charges',round(taxnCharges,2))
 dpCharges = getDPCharges(buyDate, sellDate)
 if dpCharges > 0:
     print('DP charges:',dpCharges)
-    print(f'Total Charges: {taxnCharges + dpCharges}')
+    print(f'Total Charges: {round(taxnCharges + dpCharges,2)}')
 netPL = getNetPL(buy,sell,qty,taxnCharges) - dpCharges
 print('Net PL:',round(netPL,2))
 
