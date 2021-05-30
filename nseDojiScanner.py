@@ -131,8 +131,8 @@ def getBullishHarami(bhavcopyDF):
 #Load config file. The file config.ini must be in the same folder/directory as this python program
 config = configparser.ConfigParser()
 config.read('config.ini')
-dojiScanner = config['DojiScanner']
-holidayList = dojiScanner['holidays'].strip().split(',') #List of NSE trading holidays that are on weekday
+candlestickScanner = config['CandlestickScanner']
+holidayList = candlestickScanner['holidays'].strip().split(',') #List of NSE trading holidays that are on weekday
 
 #offset value for calculating date. Default is 0 days
 backDate = 0
@@ -151,8 +151,8 @@ if len(sys.argv) > 1:
 delta = timedelta(days = backDate)
 
 #Setting the default CSV filename
-FOLDER_NAME = dojiScanner['foldername'] #Example: data/scanner/
-PREFIX_CSV = dojiScanner['csvfileprefix'] #Example: 'MW-SECURITIES-IN-F&O-'
+FOLDER_NAME = candlestickScanner['foldername'] #Example: data/scanner/
+PREFIX_CSV = candlestickScanner['csvfileprefix'] #Example: 'MW-SECURITIES-IN-F&O-'
 theDay = datetime.today() - delta
 
 #sanity check to see if the given date is a trading holiday/weekend
@@ -164,8 +164,8 @@ theDayStr = theDay.strftime('%d-%b-%Y') #format: 24-Mar-2021. dd-mmm-yyyy
 FILE_NAME = FOLDER_NAME + PREFIX_CSV + theDayStr + '.csv'
 
 #Setting the latest bhavcopy CSV filename
-BHAV_PREFIX = dojiScanner['bhavPrefix']
-BHAV_SUFFIX = dojiScanner['bhavSuffix']
+BHAV_PREFIX = candlestickScanner['bhavPrefix']
+BHAV_SUFFIX = candlestickScanner['bhavSuffix']
 theDayStr = theDayStr.replace('-','').upper() #bhavcopy file has the date in filename format ddmmyyy. Stripping '-'
 BHAV = FOLDER_NAME + BHAV_PREFIX + theDayStr + BHAV_SUFFIX + '.csv'
 # print('Debug: BHAV :', BHAV)
@@ -210,8 +210,8 @@ else:#Else use the live trade csvfile
     print('No Bhavcopy found! Proceeding with live market data CSV file for data analysis\n')
 
 #First filteration: Eliminate stocks whose prices are lower or upper than the set price band
-LOW_LIMIT = dojiScanner.getint('lowerpricelimit')
-UP_LIMIT = dojiScanner.getint('upperPriceLimit')
+LOW_LIMIT = candlestickScanner.getint('lowerpricelimit')
+UP_LIMIT = candlestickScanner.getint('upperPriceLimit')
 dfToDrop = df[(df['CLOSE'] < LOW_LIMIT) | (df['CLOSE'] > UP_LIMIT)]
 print('\nDropping {0} stocks with CLOSE price > {1} or < {2}'.format(len(dfToDrop),UP_LIMIT,LOW_LIMIT))
 df.drop(dfToDrop.index,inplace=True)
@@ -225,7 +225,7 @@ if len(df[df['HIGH']==df['LOW']]) > 0:
         print('Dropping {} from today\'s list'.format(stock))
     df.drop(bad_df.index, inplace = True)
     
-MULTIPLIER = dojiScanner.getfloat('tailtobodyratio')
+MULTIPLIER = candlestickScanner.getfloat('tailtobodyratio')
 dragonFlyDf = getBullishHammer(df,MULTIPLIER)
 if len(dragonFlyDf) > 0:
     print('\n{} stocks show Hammer Candlestick pattern'.format(len(dragonFlyDf)))
@@ -235,7 +235,7 @@ else:
     print('\nNo stocks with Hammer pattern')
 
 #Bullish Marubozu Pattern
-MARUBOZU_WICK_RATIO = dojiScanner.getfloat('marubozuShadow')
+MARUBOZU_WICK_RATIO = candlestickScanner.getfloat('marubozuShadow')
 marubozuDF = getBullishMarubozu(df, MARUBOZU_WICK_RATIO)
 if len(marubozuDF) > 0:
     print('\n{} stocks show Bullish Marubozu Candlestick pattern'.format(len(marubozuDF)))
