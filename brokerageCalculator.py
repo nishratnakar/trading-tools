@@ -76,8 +76,8 @@ def getGST(brokerage,transactionCharges):
 
 
 def getSEBIcharges(turnover):
-    '''₹5 / crore'''
-    return round(5 / 10000000 * turnover, 2)
+    '''₹10 / crore'''
+    return round(10 / 10000000 * turnover, 2) #Sebi charges updated to Rs 10 per crore
 
 
 # In[159]:
@@ -133,9 +133,9 @@ qty = 0
 isETF = False
 noSTT = False
 if len(sys.argv) > 1:
-    buyDate = datetime.strptime(sys.argv[1],'%d-%m-%Y')
+    buyDate = datetime.strptime(sys.argv[1],'%Y-%m-%d')
 if len(sys.argv) > 2:
-    sellDate = datetime.strptime(sys.argv[2],'%d-%m-%Y')
+    sellDate = datetime.strptime(sys.argv[2],'%Y-%m-%d')
 if len(sys.argv) > 3:
     buy = float(sys.argv[3])
 if len(sys.argv) > 4:
@@ -153,8 +153,8 @@ if len(sys.argv) > 6:
 
 
 if buyDate == None:
-    inp = input('Buy Date (\'ddmmYY\'):')
-    buyDate = datetime.strptime(inp,'%d%m%y')
+    inp = input('Buy Date (\'YYYY-mm-dd\'):')
+    buyDate = datetime.strptime(inp,'%Y-%m-%d')
 buyDate
 
 
@@ -162,8 +162,8 @@ buyDate
 
 
 if sellDate == None:
-    inp = input('Sell Date (\'ddmmYY\'):')
-    sellDate = datetime.strptime(inp,'%d%m%y')
+    inp = input('Sell Date (\'YYYY-mm-dd\'):')
+    sellDate = datetime.strptime(inp,'%Y-%m-%d')
 sellDate
 
 
@@ -205,7 +205,7 @@ qty
 
 
 turnover = getTurnover(buy,sell,qty)
-print('Turnover:',turnover)
+print('Turnover:',round(turnover,2))
 
 
 # In[140]:
