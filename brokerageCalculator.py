@@ -9,18 +9,14 @@
 # * To account for holidays/weekends to determine DP charges is to be applied for Delivery trades(non BTST)
 # * STT for ETFs would be different. Need to determine this too
 
-# In[153]:
 
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 import sys # for commandline arguments
+import argparse
 import configparser
 #would need to add configparser for setting constants.
 
-
-# ### Constants (Brokerage, charges, taxes,etc)
-
-# In[154]:
 
 
 def getBrokerage(buy, sell, qty, delta=timedelta(days=0)):
@@ -38,9 +34,6 @@ def getBrokerage(buy, sell, qty, delta=timedelta(days=0)):
         return order01 + order02
 
 
-# In[155]:
-
-
 def getSTT(buy, sell, qty, delta = timedelta(days=0), isETF = False):
     '''Security Transaction Tax: 
     (Delivery)0.1% on buy & sell. 
@@ -56,15 +49,9 @@ def getSTT(buy, sell, qty, delta = timedelta(days=0), isETF = False):
         return round (0.1 / 100 * getTurnover(buy,sell,qty))
 
 
-# In[156]:
-
-
 def getTransactCharges(turnover):
     '''Transaction charges by the exchange NSE/BSE NSE: 0.00345%'''
     return round(0.00345 / 100 * turnover, 2)
-
-
-# In[157]:
 
 
 def getGST(brokerage,transactionCharges):
@@ -72,15 +59,9 @@ def getGST(brokerage,transactionCharges):
     return round(18 / 100 * (brokerage + transactionCharges),2)
 
 
-# In[158]:
-
-
 def getSEBIcharges(turnover):
     '''₹10 / crore'''
     return round(10 / 10000000 * turnover, 2) #Sebi charges updated to Rs 10 per crore
-
-
-# In[159]:
 
 
 def getStampCharges(buy, qty, delta = timedelta(days = 0)):
@@ -92,19 +73,13 @@ def getStampCharges(buy, qty, delta = timedelta(days = 0)):
         return round( 0.015 / 100 * (buy * qty) ,2)
 
 
-# In[160]:
-
-
-def getDPCharges(buyDate,sellDate):
+def getDPCharges(delta):
     '''₹13.5 + GST per scrip (irrespective of quantity), 
     on the day, is debited when stocks are sold. '''
-    if (sellDate - buyDate) <= timedelta(days = 1):
+    if delta <= timedelta(days = 1):
         return 0
     else: #Need to add logic of previous trading day holiday/weekend for BTST
         return round(13.5 + (18 / 100 * 13.5 ), 2)
-
-
-# In[161]:
 
 
 def getTurnover(buy, sell, qty):
@@ -113,158 +88,96 @@ def getTurnover(buy, sell, qty):
     return (buy + sell) * qty
 
 
-# In[162]:
-
-
 def getNetPL(buy,sell,qty,charges):
     '''Net PnL before any DP charges'''
     pl = (sell - buy) * qty
     return pl - charges
 
 
-# In[169]:
+def main():
+    buyDate = None
+    sellDate = None
+    delta = timedelta(days=0)
+    buy = 0
+    sell = 0
+    qty = 0
+    isETF = False
+    is_stt = True
+    today = date.today()
 
+    parser = argparse.ArgumentParser('Brokerage calculator')
+    sub_parsers = parser.add_subparsers(help='Calculate based on dates or delta command',dest='subparser_name')
+    #Dates sub-command
+    dates_parser = sub_parsers.add_parser('dates', help='Brokerage calculation based on buy and sell dates')
+    dates_parser.add_argument('buy_date', type=date.fromisoformat, nargs='?', default=today, metavar='BuyDate', help='The Buy date in iso format (YYYY-MM-DD). Default is today\'s date')
+    dates_parser.add_argument('sell_date', type=date.fromisoformat, nargs='?',default=today, metavar='SellDate', help='The Sell date in iso format (YYYY-MM-DD). Default is today\'s date')
 
-buyDate = None
-sellDate = None
-buy = 0
-sell = 0
-qty = 0
-isETF = False
-noSTT = False
-if len(sys.argv) > 1:
-    buyDate = datetime.strptime(sys.argv[1],'%Y-%m-%d')
-if len(sys.argv) > 2:
-    sellDate = datetime.strptime(sys.argv[2],'%Y-%m-%d')
-if len(sys.argv) > 3:
-    buy = float(sys.argv[3])
-if len(sys.argv) > 4:
-    sell = float(sys.argv[4])
-if len(sys.argv) > 5:
-    qty = int(sys.argv[5])
-if len(sys.argv) > 6:
-    if sys.argv[6].upper() == 'ETF':
+    #Delta sub-command
+    delta_parser = sub_parsers.add_parser('delta', help='Brokerage calculation based on number of days of holding.')
+    delta_parser.add_argument('-d', '--delta', action='count', default=0, help='Increase holding period. Default is %(default)s')
+
+    #Common features
+    parser.add_argument('buy_price', type=float, help='The buy price', metavar='BuyPrice')
+    parser.add_argument('sell_price', type=float, help='The sell price', metavar='SellPrice')
+    parser.add_argument('quantity', type=int, help='Quantity of shares traded', metavar='QTY')
+    parser.add_argument('-e', '--etf', action='store_true', help='If the stock is ETF' )
+    parser.add_argument('-n', '--nostt', action='store_true', help='Sets STT as not applicable' )
+
+    #Parse arguments
+    args = parser.parse_args()
+
+    if args.subparser_name == 'dates':
+        buyDate = args.buy_date
+        sellDate = args.sell_date
+        delta = sellDate - buyDate
+    else:
+        delta = timedelta(days=args.delta)
+
+    buy = args.buy_price
+    sell = args.sell_price
+    qty = args.quantity
+
+    #Common optional arguments
+    if args.etf:
         isETF = True
-    elif sys.argv[6].upper() == 'NA':
-        noSTT = True
+    if args.nostt:
+        is_stt = False
+    
+    turnover = getTurnover(buy,sell,qty)
+    print('Turnover:',round(turnover,2))
 
+    brokerage = getBrokerage(buy, sell, qty, delta)
+    print('Brokerage:',brokerage)
 
-# In[133]:
+    #Get STT eligibility
+    STT = 0
+    if is_stt:
+        STT = getSTT(buy, sell, qty, delta, isETF)
+    print('STT:',STT)
 
+    transCharges = getTransactCharges(turnover)
+    print('Transaction Charges:',transCharges)
 
-if buyDate == None:
-    inp = input('Buy Date (\'YYYY-mm-dd\'):')
-    buyDate = datetime.strptime(inp,'%Y-%m-%d')
-buyDate
+    GST = getGST(brokerage,transCharges)
+    print('GST:',GST)
 
+    sebiCharges = getSEBIcharges(turnover)
+    print('SEBI Charges:',sebiCharges)
 
-# In[134]:
+    stampDuty = getStampCharges(buy, qty, delta)
+    print('Stamp Duty:',stampDuty)
 
+    taxnCharges = brokerage + STT + transCharges + GST + sebiCharges + stampDuty
+    taxnCharges = round(taxnCharges,2)
 
-if sellDate == None:
-    inp = input('Sell Date (\'YYYY-mm-dd\'):')
-    sellDate = datetime.strptime(inp,'%Y-%m-%d')
-sellDate
+    print('Gross PL:',round((sell-buy)*qty, 2))
+    print('Total Tax and Transaction Charges',round(taxnCharges,2))
+    dpCharges = getDPCharges(delta)
+    if dpCharges > 0:
+        print('DP charges:',dpCharges)
+        print(f'Total Charges: {round(taxnCharges + dpCharges,2)}')
+    netPL = getNetPL(buy,sell,qty,taxnCharges) - dpCharges
+    print('Net PL:',round(netPL,2))
 
-
-# In[135]:
-
-
-delta = sellDate - buyDate
-delta
-
-
-# In[136]:
-
-
-if buy == 0:
-    inp = input('Buy Price:')
-    buy = float(inp)
-buy
-
-
-# In[137]:
-
-
-if sell == 0:
-    inp = input('Sell Price:')
-    sell = float(inp)
-sell
-
-
-# In[170]:
-
-
-if qty == 0:
-    inp = input('Qty:')
-    qty = float(inp)
-qty
-
-
-# In[139]:
-
-
-turnover = getTurnover(buy,sell,qty)
-print('Turnover:',round(turnover,2))
-
-
-# In[140]:
-
-
-brokerage = getBrokerage(buy, sell, qty, delta)
-print('Brokerage:',brokerage)
-
-
-# In[141]:
-
-STT = 0
-if noSTT == False:
-    STT = getSTT(buy, sell, qty, delta, isETF)
-print('STT:',STT)
-
-
-# In[142]:
-
-
-transCharges = getTransactCharges(turnover)
-print('Transaction Charges:',transCharges)
-
-
-# In[143]:
-
-
-GST = getGST(brokerage,transCharges)
-print('GST:',GST)
-
-
-# In[144]:
-
-
-sebiCharges = getSEBIcharges(turnover)
-print('SEBI Charges:',sebiCharges)
-
-
-# In[145]:
-
-
-stampDuty = getStampCharges(buy, qty, delta)
-print('Stamp Duty:',stampDuty)
-
-
-# In[146]:
-
-
-taxnCharges = brokerage + STT + transCharges + GST + sebiCharges + stampDuty
-taxnCharges = round(taxnCharges,2)
-
-# In[150]:
-
-print('Gross PL:',round((sell-buy)*qty, 2))
-print('Total Tax and Transaction Charges',round(taxnCharges,2))
-dpCharges = getDPCharges(buyDate, sellDate)
-if dpCharges > 0:
-    print('DP charges:',dpCharges)
-    print(f'Total Charges: {round(taxnCharges + dpCharges,2)}')
-netPL = getNetPL(buy,sell,qty,taxnCharges) - dpCharges
-print('Net PL:',round(netPL,2))
+main()
 
