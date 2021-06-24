@@ -110,7 +110,7 @@ def getBullishEngulfing(bhavcopyDF,prevBhavFile):
         print('\nPrevious trading day data file not found. Cannot Create Engulfing pattern')
         return pd.DataFrame()
     print('\nPrevious day bhavcopy found:', prevBhavFile)
-    prevDayBhavDF = getBhavCopyData(df.index, prevBhavFile)
+    prevDayBhavDF = getBhavCopyData(bhavcopyDF.index, prevBhavFile)
     bhavcopyDF['PREVOPEN'] = prevDayBhavDF['OPEN']
     return bhavcopyDF.loc[
             ( ( bhavcopyDF['PREVOPEN'] > bhavcopyDF['PREVCLOSE'] ) & ( bhavcopyDF['CLOSE'] > bhavcopyDF['OPEN'] ) ) &
@@ -128,148 +128,152 @@ def getBullishHarami(bhavcopyDF):
         ['OPEN','PREVCLOSE','CLOSE','PREVOPEN']
     ]
 
-#Load config file. The file config.ini must be in the same folder/directory as this python program
-config = configparser.ConfigParser()
-config.read('config.ini')
-candlestickScanner = config['CandlestickScanner']
-holidayList = candlestickScanner['holidays'].strip().split(',') #List of NSE trading holidays that are on weekday
+def main():
+    #Load config file. The file config.ini must be in the same folder/directory as this python program
+    config = configparser.ConfigParser()
+    config.read('config.ini')
+    candlestickScanner = config['CandlestickScanner']
+    holidayList = candlestickScanner['holidays'].strip().split(',') #List of NSE trading holidays that are on weekday
 
-#offset value for calculating date. Default is 0 days
-backDate = 0
+    #offset value for calculating date. Default is 0 days
+    backDate = 0
 
-#Checking for CLI arguments for offset date, if any.
-if len(sys.argv) > 1:
-    if sys.argv[1].upper() == '-D':
-        if len(sys.argv) > 2:
-            if sys.argv[2].isdigit():
-                backDate = int(sys.argv[2])
+    #Checking for CLI arguments for offset date, if any.
+    if len(sys.argv) > 1:
+        if sys.argv[1].upper() == '-D':
+            if len(sys.argv) > 2:
+                if sys.argv[2].isdigit():
+                    backDate = int(sys.argv[2])
+                else:
+                    backDate = 1
             else:
                 backDate = 1
+
+    delta = timedelta(days = backDate)
+
+    #Setting the default CSV filename
+    FOLDER_NAME = candlestickScanner['foldername'] #Example: data/scanner/
+    PREFIX_CSV = candlestickScanner['csvfileprefix'] #Example: 'MW-SECURITIES-IN-F&O-'
+    theDay = datetime.today() - delta
+
+    #sanity check to see if the given date is a trading holiday/weekend
+    if isTradingHoliday(theDay,holidayList):
+        print('The given date\'{}\' is a trading holiday/weekend. Select another date'.format(theDay.strftime('%d-%b-%Y')))
+        sys.exit()
+
+    theDayStr = theDay.strftime('%d-%b-%Y') #format: 24-Mar-2021. dd-mmm-yyyy
+    FILE_NAME = FOLDER_NAME + PREFIX_CSV + theDayStr + '.csv'
+
+    #Setting the latest bhavcopy CSV filename
+    BHAV_PREFIX = candlestickScanner['bhavPrefix']
+    BHAV_SUFFIX = candlestickScanner['bhavSuffix']
+    theDayStr = theDayStr.replace('-','').upper() #bhavcopy file has the date in filename format ddmmyyy. Stripping '-'
+    BHAV = FOLDER_NAME + BHAV_PREFIX + theDayStr + BHAV_SUFFIX + '.csv'
+    # print('Debug: BHAV :', BHAV)
+
+    #Sanity check to see of live market segment CSV file exists
+    print('\nVerifying the live market data CSV file')
+    FILE_NAME = fileValidityCheck(FILE_NAME)
+    if not FILE_NAME:
+        print('#User input None. Exiting the program..')
+        sys.exit()
+    print('Live market data CSV file present: ',FILE_NAME)
+
+    #Read CSV file into a dataframe.
+    df = pd.read_csv(FILE_NAME,thousands=',') 
+
+    #Rename columns to keep it clean. Column names from NSE website has \n and other characters.
+    df.columns = ['SYMBOL','OPEN', 'HIGH', 'LOW', 'PREVCLOSE', 'CLOSE', 'CHNG',
+        '%CHNG', 'VOLUME', 'VALUE', '52W H', '52W L',
+        '365 D', '30 D'] #LTP or last traded price column is set as CLOSE
+
+    df.set_index('SYMBOL',inplace=True)
+
+    now = datetime.now()
+    today = datetime(year=now.year,month=now.month,day=now.day)
+    theDay = datetime(theDay.year, theDay.month, theDay.day)
+    # print('#Debug: now:',now)
+    # print('#Debug: today:',today)
+    # print('#Debug: theDay:',theDay)
+    # print('#Debug: today == theDay',(today == theDay))
+    # print('#Debug: today > theDay',(today > theDay))
+    # if the day to fetch data is current day and time is greater than or equal to 6:00pm,
+    # or if the day to fetch data is prior to current trading day , only then bhavcopy is available
+    found = False
+    if ((today == theDay) and ( now.hour >= 18 )) or today > theDay:
+        found = getMarketData.fetchBhavcopy(theDayStr,FOLDER_NAME,BHAV)
+
+    if found:#Will use bhavcopy for analysis if available.
+        print('Bhavcopy fetched successfully for date:',theDayStr)
+        # print('Proceeding with Bhavcopy file \'{}\' for data analysis\n'.format(BHAV))
+        df = getBhavCopyData(df.index,BHAV)
+    else:#Else use the live trade csvfile
+        print('No Bhavcopy found! Proceeding with live market data CSV file for data analysis\n')
+
+    #First filteration: Eliminate stocks whose prices are lower or upper than the set price band
+    LOW_LIMIT = candlestickScanner.getint('lowerpricelimit')
+    UP_LIMIT = candlestickScanner.getint('upperPriceLimit')
+    dfToDrop = df[(df['CLOSE'] < LOW_LIMIT) | (df['CLOSE'] > UP_LIMIT)]
+    print('\nDropping {0} stocks with CLOSE price > {1} or < {2}'.format(len(dfToDrop),UP_LIMIT,LOW_LIMIT))
+    df.drop(dfToDrop.index,inplace=True)
+
+    #SANITY CHECK. To drop any stocks where high == Low to avoid infinity position size.
+    if len(df[df['HIGH']==df['LOW']]) > 0:
+        bad_df = df[ df['HIGH'] == df['LOW'] ]
+        print ('ALERT: {} stock/stocks with HIGH = LOW'.format(len(bad_df)))
+        print( bad_df )
+        for stock in bad_df.index:
+            print('Dropping {} from today\'s list'.format(stock))
+        df.drop(bad_df.index, inplace = True)
+        
+    MULTIPLIER = candlestickScanner.getfloat('tailtobodyratio')
+    dragonFlyDf = getBullishHammer(df,MULTIPLIER)
+    if len(dragonFlyDf) > 0:
+        print('\n{} stocks show Hammer Candlestick pattern'.format(len(dragonFlyDf)))
+        for stock in dragonFlyDf.index:
+            print(stock)
+    else:
+        print('\nNo stocks with Hammer pattern')
+
+    #Bullish Marubozu Pattern
+    MARUBOZU_WICK_RATIO = candlestickScanner.getfloat('marubozuShadow')
+    marubozuDF = getBullishMarubozu(df, MARUBOZU_WICK_RATIO)
+    if len(marubozuDF) > 0:
+        print('\n{} stocks show Bullish Marubozu Candlestick pattern'.format(len(marubozuDF)))
+        for stock in marubozuDF.index:
+            print(stock)
+    else:
+        print('\nNo stocks with Bullish Marubozu pattern')
+
+    #Bullish Engulfing Pattern
+    prevDay = getPrevTradingDay(theDay - timedelta(days=1),holidayList)
+    # print('\nPrevious Trading day is', prevDay)
+    prevBhavFile = FOLDER_NAME + BHAV_PREFIX + prevDay + BHAV_SUFFIX + '.csv'
+    found = getMarketData.fetchBhavcopy(prevDay,FOLDER_NAME, prevBhavFile)
+    if found:
+        # print('Bhavcopy fetched successfully for date:',prevDay)
+        engulfingDF = getBullishEngulfing(df,prevBhavFile)
+        if len(engulfingDF) > 0:
+            print('\n{} stocks show Bullish Engulfing Candlestick pattern'.format(len(engulfingDF)))
+            for stock in engulfingDF.index:
+                print(stock)
         else:
-            backDate = 1
-
-delta = timedelta(days = backDate)
-
-#Setting the default CSV filename
-FOLDER_NAME = candlestickScanner['foldername'] #Example: data/scanner/
-PREFIX_CSV = candlestickScanner['csvfileprefix'] #Example: 'MW-SECURITIES-IN-F&O-'
-theDay = datetime.today() - delta
-
-#sanity check to see if the given date is a trading holiday/weekend
-if isTradingHoliday(theDay,holidayList):
-    print('The given date\'{}\' is a trading holiday/weekend. Select another date'.format(theDay.strftime('%d-%b-%Y')))
-    sys.exit()
-
-theDayStr = theDay.strftime('%d-%b-%Y') #format: 24-Mar-2021. dd-mmm-yyyy
-FILE_NAME = FOLDER_NAME + PREFIX_CSV + theDayStr + '.csv'
-
-#Setting the latest bhavcopy CSV filename
-BHAV_PREFIX = candlestickScanner['bhavPrefix']
-BHAV_SUFFIX = candlestickScanner['bhavSuffix']
-theDayStr = theDayStr.replace('-','').upper() #bhavcopy file has the date in filename format ddmmyyy. Stripping '-'
-BHAV = FOLDER_NAME + BHAV_PREFIX + theDayStr + BHAV_SUFFIX + '.csv'
-# print('Debug: BHAV :', BHAV)
-
-#Sanity check to see of live market segment CSV file exists
-print('\nVerifying the live market data CSV file')
-FILE_NAME = fileValidityCheck(FILE_NAME)
-if not FILE_NAME:
-    print('#User input None. Exiting the program..')
-    sys.exit()
-print('Live market data CSV file present: ',FILE_NAME)
-
-#Read CSV file into a dataframe.
-df = pd.read_csv(FILE_NAME,thousands=',') 
-
-#Rename columns to keep it clean. Column names from NSE website has \n and other characters.
-df.columns = ['SYMBOL','OPEN', 'HIGH', 'LOW', 'PREVCLOSE', 'CLOSE', 'CHNG',
-       '%CHNG', 'VOLUME', 'VALUE', '52W H', '52W L',
-       '365 D', '30 D'] #LTP or last traded price column is set as CLOSE
-
-df.set_index('SYMBOL',inplace=True)
-
-now = datetime.now()
-today = datetime(year=now.year,month=now.month,day=now.day)
-theDay = datetime(theDay.year, theDay.month, theDay.day)
-# print('#Debug: now:',now)
-# print('#Debug: today:',today)
-# print('#Debug: theDay:',theDay)
-# print('#Debug: today == theDay',(today == theDay))
-# print('#Debug: today > theDay',(today > theDay))
-# if the day to fetch data is current day and time is greater than or equal to 6:00pm,
-# or if the day to fetch data is prior to current trading day , only then bhavcopy is available
-found = False
-if ((today == theDay) and ( now.hour >= 18 )) or today > theDay:
-    found = getMarketData.fetchBhavcopy(theDayStr,FOLDER_NAME,BHAV)
-
-if found:#Will use bhavcopy for analysis if available.
-    print('Bhavcopy fetched successfully for date:',theDayStr)
-    # print('Proceeding with Bhavcopy file \'{}\' for data analysis\n'.format(BHAV))
-    df = getBhavCopyData(df.index,BHAV)
-else:#Else use the live trade csvfile
-    print('No Bhavcopy found! Proceeding with live market data CSV file for data analysis\n')
-
-#First filteration: Eliminate stocks whose prices are lower or upper than the set price band
-LOW_LIMIT = candlestickScanner.getint('lowerpricelimit')
-UP_LIMIT = candlestickScanner.getint('upperPriceLimit')
-dfToDrop = df[(df['CLOSE'] < LOW_LIMIT) | (df['CLOSE'] > UP_LIMIT)]
-print('\nDropping {0} stocks with CLOSE price > {1} or < {2}'.format(len(dfToDrop),UP_LIMIT,LOW_LIMIT))
-df.drop(dfToDrop.index,inplace=True)
-
-#SANITY CHECK. To drop any stocks where high == Low to avoid infinity position size.
-if len(df[df['HIGH']==df['LOW']]) > 0:
-    bad_df = df[ df['HIGH'] == df['LOW'] ]
-    print ('ALERT: {} stock/stocks with HIGH = LOW'.format(len(bad_df)))
-    print( bad_df )
-    for stock in bad_df.index:
-        print('Dropping {} from today\'s list'.format(stock))
-    df.drop(bad_df.index, inplace = True)
-    
-MULTIPLIER = candlestickScanner.getfloat('tailtobodyratio')
-dragonFlyDf = getBullishHammer(df,MULTIPLIER)
-if len(dragonFlyDf) > 0:
-    print('\n{} stocks show Hammer Candlestick pattern'.format(len(dragonFlyDf)))
-    for stock in dragonFlyDf.index:
-        print(stock)
-else:
-    print('\nNo stocks with Hammer pattern')
-
-#Bullish Marubozu Pattern
-MARUBOZU_WICK_RATIO = candlestickScanner.getfloat('marubozuShadow')
-marubozuDF = getBullishMarubozu(df, MARUBOZU_WICK_RATIO)
-if len(marubozuDF) > 0:
-    print('\n{} stocks show Bullish Marubozu Candlestick pattern'.format(len(marubozuDF)))
-    for stock in marubozuDF.index:
-        print(stock)
-else:
-    print('\nNo stocks with Bullish Marubozu pattern')
-
-#Bullish Engulfing Pattern
-prevDay = getPrevTradingDay(theDay - timedelta(days=1),holidayList)
-# print('\nPrevious Trading day is', prevDay)
-prevBhavFile = FOLDER_NAME + BHAV_PREFIX + prevDay + BHAV_SUFFIX + '.csv'
-found = getMarketData.fetchBhavcopy(prevDay,FOLDER_NAME, prevBhavFile)
-if found:
-    # print('Bhavcopy fetched successfully for date:',prevDay)
-    engulfingDF = getBullishEngulfing(df,prevBhavFile)
-    if len(engulfingDF) > 0:
-        print('\n{} stocks show Bullish Engulfing Candlestick pattern'.format(len(engulfingDF)))
-        for stock in engulfingDF.index:
-            print(stock)
+            print('\nNo stocks with Bullish Engulfing pattern')
     else:
-        print('\nNo stocks with Bullish Engulfing pattern')
-else:
-    print('Warning!No Bhavcopy found for previous trading day:{}'.format(prevDay))
-    print('Skipping Bullish Engulfing scan')
+        print('Warning!No Bhavcopy found for previous trading day:{}'.format(prevDay))
+        print('Skipping Bullish Engulfing scan')
 
-#Bullish Harami Pattern
-if not fileValidityCheck(prevBhavFile):
-    print('Previous day bhavcopy not found. Hence cannot find the bullish harami pattern')
-else:
-    haramiDF = getBullishHarami(df)
-    if not haramiDF.empty:
-        print('\n{} stocks show Bullish Harami Candlestick pattern'.format(len(haramiDF)))
-        for stock in haramiDF.index:
-            print(stock)
+    #Bullish Harami Pattern
+    if not fileValidityCheck(prevBhavFile):
+        print('Previous day bhavcopy not found. Hence cannot find the bullish harami pattern')
     else:
-        print('\nNo stocks with Bullish Harami pattern')
+        haramiDF = getBullishHarami(df)
+        if not haramiDF.empty:
+            print('\n{} stocks show Bullish Harami Candlestick pattern'.format(len(haramiDF)))
+            for stock in haramiDF.index:
+                print(stock)
+        else:
+            print('\nNo stocks with Bullish Harami pattern')
+
+if __name__  == "__main__":
+    main()
