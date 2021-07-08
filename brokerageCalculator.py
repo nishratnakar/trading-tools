@@ -95,28 +95,20 @@ def getNetPL(buy,sell,qty,charges):
 
 
 def main():
-    buyDate = None
-    sellDate = None
+    # buyDate = None
+    # sellDate = None
     delta = timedelta(days=0)
     buy = 0
     sell = 0
     qty = 0
     isETF = False
     is_stt = True
-    today = date.today()
+    # today = date.today()
 
     parser = argparse.ArgumentParser('Brokerage calculator')
-    sub_parsers = parser.add_subparsers(help='Calculate based on dates or delta command',dest='subparser_name')
-    #Dates sub-command
-    dates_parser = sub_parsers.add_parser('dates', help='Brokerage calculation based on buy and sell dates')
-    dates_parser.add_argument('buy_date', type=date.fromisoformat, nargs='?', default=today, metavar='BuyDate', help='The Buy date in iso format (YYYY-MM-DD). Default is today\'s date')
-    dates_parser.add_argument('sell_date', type=date.fromisoformat, nargs='?',default=today, metavar='SellDate', help='The Sell date in iso format (YYYY-MM-DD). Default is today\'s date')
-
-    #Delta sub-command
-    delta_parser = sub_parsers.add_parser('delta', help='Brokerage calculation based on number of days of holding.')
-    delta_parser.add_argument('-d', '--delta', action='count', default=0, help='Increase holding period. Default is %(default)s')
-
+    
     #Common features
+    parser.add_argument('-d', '--delta', action='count', default=0, help='Increase holding period. Default is %(default)s')
     parser.add_argument('buy_price', type=float, help='The buy price', metavar='BuyPrice')
     parser.add_argument('sell_price', type=float, help='The sell price', metavar='SellPrice')
     parser.add_argument('quantity', type=int, help='Quantity of shares traded', metavar='QTY')
@@ -126,13 +118,7 @@ def main():
     #Parse arguments
     args = parser.parse_args()
 
-    if args.subparser_name == 'dates':
-        buyDate = args.buy_date
-        sellDate = args.sell_date
-        delta = sellDate - buyDate
-    else:
-        delta = timedelta(days=args.delta)
-
+    delta = timedelta(days=args.delta)
     buy = args.buy_price
     sell = args.sell_price
     qty = args.quantity
@@ -147,7 +133,7 @@ def main():
     print('Turnover:',round(turnover,2))
 
     brokerage = getBrokerage(buy, sell, qty, delta)
-    print('Brokerage:',brokerage)
+    print('Brokerage:',round(brokerage,2))
 
     #Get STT eligibility
     STT = 0
