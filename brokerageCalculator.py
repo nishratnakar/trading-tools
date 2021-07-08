@@ -76,7 +76,7 @@ def getStampCharges(buy, qty, delta = timedelta(days = 0)):
 def getDPCharges(delta):
     '''₹13.5 + GST per scrip (irrespective of quantity), 
     on the day, is debited when stocks are sold. '''
-    if delta <= timedelta(days = 1):
+    if delta < timedelta(days = 1):
         return 0
     else: #Need to add logic of previous trading day holiday/weekend for BTST
         return round(13.5 + (18 / 100 * 13.5 ), 2)
