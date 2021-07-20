@@ -22,7 +22,7 @@ import pandas as pd
 import configparser
 import sys
 import os
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, date
 import getMarketData
 import urllib3
 urllib3.disable_warnings()
@@ -190,8 +190,8 @@ def main():
     df.set_index('SYMBOL',inplace=True)
 
     now = datetime.now()
-    today = datetime(year=now.year,month=now.month,day=now.day)
-    theDay = datetime(theDay.year, theDay.month, theDay.day)
+    today = date(year=now.year,month=now.month,day=now.day)
+    theDay = date(theDay.year, theDay.month, theDay.day)
     # print('#Debug: now:',now)
     # print('#Debug: today:',today)
     # print('#Debug: theDay:',theDay)
