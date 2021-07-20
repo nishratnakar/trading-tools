@@ -77,7 +77,7 @@ def getBullishHammer(df, MULTIPLIER=3):
     print('-------------------------------')
     print('Minimum Tail/Body Ratio = \'{} : 1\''.format(MULTIPLIER))
     #Both Green (Close>=Open) and Red (OPEN>CLOSE) Dragonfly dojis or hammer candlestick formations
-    return df[ (
+    dragonFlyDf = df[ (
                     (df['CLOSE'] >= df['OPEN']) 
                 & ( (df['OPEN'] - df['LOW'] ) > ((df['CLOSE'] - df['OPEN']) * MULTIPLIER) )
                 & ( (df['HIGH'] - df['CLOSE']) < (df['CLOSE'] - df['OPEN']) )
@@ -88,6 +88,12 @@ def getBullishHammer(df, MULTIPLIER=3):
                 & ( (df['HIGH'] - df['OPEN']) < (df['OPEN'] - df['CLOSE']) )
                 )
             ]
+    if len(dragonFlyDf) > 0:
+        print('\n{} stocks show Hammer Candlestick pattern'.format(len(dragonFlyDf)))
+        for stock in dragonFlyDf.index:
+            print(stock)
+    else:
+        print('\nNo stocks with Hammer pattern')
     
 
 def getBullishMarubozu(bhavcopyDF, SHADOW_RATIO = 0.07):
@@ -95,11 +101,17 @@ def getBullishMarubozu(bhavcopyDF, SHADOW_RATIO = 0.07):
     print('\nBULLISH MARUBOZU CANDLESTICK SCAN')
     print('---------------------------------')
     print('\nMarubozu Shadow to body ratio :',SHADOW_RATIO)
-    return bhavcopyDF.loc[
+    marubozuDF = bhavcopyDF.loc[
      ( bhavcopyDF['CLOSE'] > bhavcopyDF['OPEN'] ) &
      ((( bhavcopyDF['HIGH'] - bhavcopyDF['CLOSE'] ) / ( bhavcopyDF['CLOSE'] - bhavcopyDF['OPEN'] )) < SHADOW_RATIO ) &
      ((( bhavcopyDF['OPEN'] - bhavcopyDF['LOW'] ) / ( bhavcopyDF['CLOSE'] - bhavcopyDF['OPEN'] )) < SHADOW_RATIO )
     ]
+    if len(marubozuDF) > 0:
+        print('\n{} stocks show Bullish Marubozu Candlestick pattern'.format(len(marubozuDF)))
+        for stock in marubozuDF.index:
+            print(stock)
+    else:
+        print('\nNo stocks with Bullish Marubozu pattern')
 
 def getBullishEngulfing(bhavcopyDF,prevBhavFile):
     '''Gets stocks that are forming Bullish Engulfing pattern'''
@@ -226,24 +238,15 @@ def main():
             print('Dropping {} from today\'s list'.format(stock))
         df.drop(bad_df.index, inplace = True)
         
+    #Bullish Hammer Pattern
     MULTIPLIER = candlestickScanner.getfloat('tailtobodyratio')
-    dragonFlyDf = getBullishHammer(df,MULTIPLIER)
-    if len(dragonFlyDf) > 0:
-        print('\n{} stocks show Hammer Candlestick pattern'.format(len(dragonFlyDf)))
-        for stock in dragonFlyDf.index:
-            print(stock)
-    else:
-        print('\nNo stocks with Hammer pattern')
+    getBullishHammer(df,MULTIPLIER)
+    
 
     #Bullish Marubozu Pattern
     MARUBOZU_WICK_RATIO = candlestickScanner.getfloat('marubozuShadow')
-    marubozuDF = getBullishMarubozu(df, MARUBOZU_WICK_RATIO)
-    if len(marubozuDF) > 0:
-        print('\n{} stocks show Bullish Marubozu Candlestick pattern'.format(len(marubozuDF)))
-        for stock in marubozuDF.index:
-            print(stock)
-    else:
-        print('\nNo stocks with Bullish Marubozu pattern')
+    getBullishMarubozu(df, MARUBOZU_WICK_RATIO)
+    
 
     #Bullish Engulfing Pattern
     prevDay = getPrevTradingDay(theDay - timedelta(days=1),holidayList)
