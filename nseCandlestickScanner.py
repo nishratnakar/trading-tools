@@ -25,7 +25,10 @@ import os
 from datetime import timedelta, datetime, date
 import getMarketData
 import urllib3
+import argparse
 urllib3.disable_warnings()
+
+VERBOSE = False
 
 def fileValidityCheck(FILE_NAME, IGNORE=False):
     '''Checks to see if a file exists. If not, asks user input for a valid name if IGNORE=True.
@@ -156,22 +159,17 @@ def main():
     config = configparser.ConfigParser()
     config.read('config.ini')
     candlestickScanner = config['CandlestickScanner']
+
+    parser = argparse.ArgumentParser(description='NSE Candlestick Pattern Scanner')
+    parser.add_argument('-v','--verbose', action='store_true', default=False, help='Add verbosity')
+    parser.add_argument('-d', '--delta', type=int, default=0, help='Offset to scan using backdate. Default is %(default)s days')
+    args = parser.parse_args()
+
     holidayList = candlestickScanner['holidays'].strip().split(',') #List of NSE trading holidays that are on weekday
 
     #offset value for calculating date. Default is 0 days
-    backDate = 0
-
-    #Checking for CLI arguments for offset date, if any.
-    if len(sys.argv) > 1:
-        if sys.argv[1].upper() == '-D':
-            if len(sys.argv) > 2:
-                if sys.argv[2].isdigit():
-                    backDate = int(sys.argv[2])
-                else:
-                    backDate = 1
-            else:
-                backDate = 1
-
+    backDate = args.delta
+    # print('#Debug: backdate =',backDate)
     delta = timedelta(days = backDate)
 
     #Setting the default CSV filename
