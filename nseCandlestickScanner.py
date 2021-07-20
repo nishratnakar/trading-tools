@@ -113,22 +113,24 @@ def getBullishMarubozu(bhavcopyDF, SHADOW_RATIO = 0.07):
     else:
         print('\nNo stocks with Bullish Marubozu pattern')
 
-def getBullishEngulfing(bhavcopyDF,prevBhavFile):
+def getBullishEngulfing(bhavcopyDF,prevBhavFound):
     '''Gets stocks that are forming Bullish Engulfing pattern'''
     print('\nBULLISH ENGULFING CANDLESTICK SCAN')
     print('----------------------------------')
-    prevBhavFile = fileValidityCheck(prevBhavFile)
-    if not prevBhavFile:
-        print('\nPrevious trading day data file not found. Cannot Create Engulfing pattern')
-        return pd.DataFrame()
-    print('\nPrevious day bhavcopy found:', prevBhavFile)
-    prevDayBhavDF = getBhavCopyData(bhavcopyDF.index, prevBhavFile)
-    bhavcopyDF['PREVOPEN'] = prevDayBhavDF['OPEN']
-    return bhavcopyDF.loc[
+    if not prevBhavFound:
+        print('\nPrevious trading session data file not found. Cannot Create Engulfing pattern')
+        return
+    engulfingDF = bhavcopyDF.loc[
             ( ( bhavcopyDF['PREVOPEN'] > bhavcopyDF['PREVCLOSE'] ) & ( bhavcopyDF['CLOSE'] > bhavcopyDF['OPEN'] ) ) &
             ( ( bhavcopyDF['OPEN'] < bhavcopyDF['PREVCLOSE'] ) & ( bhavcopyDF['CLOSE'] > bhavcopyDF['PREVOPEN'] ) ),
             ['OPEN','PREVCLOSE','CLOSE','PREVOPEN']
         ]
+    if len(engulfingDF) > 0:
+        print('\n{} stocks show Bullish Engulfing Candlestick pattern'.format(len(engulfingDF)))
+        for stock in engulfingDF.index:
+            print(stock)
+    else:
+        print('\nNo stocks with Bullish Engulfing pattern')
 
 def getBullishHarami(bhavcopyDF):
     '''Gets stocks that are forming Bullish Harami pattern'''
@@ -237,7 +239,17 @@ def main():
         for stock in bad_df.index:
             print('Dropping {} from today\'s list'.format(stock))
         df.drop(bad_df.index, inplace = True)
-        
+
+    #Get Previous session bhavcopy
+    prevDay = getPrevTradingDay(theDay - timedelta(days=1),holidayList)
+    # print('\nPrevious Trading day is', prevDay)
+    prevBhavFile = FOLDER_NAME + BHAV_PREFIX + prevDay + BHAV_SUFFIX + '.csv'
+    found = getMarketData.fetchBhavcopy(prevDay,FOLDER_NAME, prevBhavFile)
+    if found:
+        prevDayBhavDF = getBhavCopyData(df.index, prevBhavFile)
+        df['PREVOPEN'] = prevDayBhavDF['OPEN']
+
+    
     #Bullish Hammer Pattern
     MULTIPLIER = candlestickScanner.getfloat('tailtobodyratio')
     getBullishHammer(df,MULTIPLIER)
@@ -249,22 +261,9 @@ def main():
     
 
     #Bullish Engulfing Pattern
-    prevDay = getPrevTradingDay(theDay - timedelta(days=1),holidayList)
-    # print('\nPrevious Trading day is', prevDay)
-    prevBhavFile = FOLDER_NAME + BHAV_PREFIX + prevDay + BHAV_SUFFIX + '.csv'
-    found = getMarketData.fetchBhavcopy(prevDay,FOLDER_NAME, prevBhavFile)
     if found:
-        # print('Bhavcopy fetched successfully for date:',prevDay)
-        engulfingDF = getBullishEngulfing(df,prevBhavFile)
-        if len(engulfingDF) > 0:
-            print('\n{} stocks show Bullish Engulfing Candlestick pattern'.format(len(engulfingDF)))
-            for stock in engulfingDF.index:
-                print(stock)
-        else:
-            print('\nNo stocks with Bullish Engulfing pattern')
-    else:
-        print('Warning!No Bhavcopy found for previous trading day:{}'.format(prevDay))
-        print('Skipping Bullish Engulfing scan')
+        getBullishEngulfing(df,prevBhavFile)
+
 
     #Bullish Harami Pattern
     if not fileValidityCheck(prevBhavFile):
