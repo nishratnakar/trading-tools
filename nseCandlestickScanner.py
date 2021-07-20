@@ -118,7 +118,7 @@ def getBullishEngulfing(bhavcopyDF,prevBhavFound):
     print('\nBULLISH ENGULFING CANDLESTICK SCAN')
     print('----------------------------------')
     if not prevBhavFound:
-        print('\nPrevious trading session data file not found. Cannot Create Engulfing pattern')
+        print('\nPrevious trading session data file not found. Cannot scan for Bullish Engulfing pattern')
         return
     engulfingDF = bhavcopyDF.loc[
             ( ( bhavcopyDF['PREVOPEN'] > bhavcopyDF['PREVCLOSE'] ) & ( bhavcopyDF['CLOSE'] > bhavcopyDF['OPEN'] ) ) &
@@ -132,15 +132,24 @@ def getBullishEngulfing(bhavcopyDF,prevBhavFound):
     else:
         print('\nNo stocks with Bullish Engulfing pattern')
 
-def getBullishHarami(bhavcopyDF):
+def getBullishHarami(bhavcopyDF, prevBhavFound):
     '''Gets stocks that are forming Bullish Harami pattern'''
     print('\nBULLISH HARAMI CANDLESTICK SCAN')
     print('-------------------------------')
-    return bhavcopyDF.loc[
+    if not prevBhavFound:
+        print('Previous trading session data file not found. Cannot scan for Bullish Harami pattern')
+        return
+    haramiDF = bhavcopyDF.loc[
         ( ( bhavcopyDF['PREVOPEN'] > bhavcopyDF['PREVCLOSE'] ) & ( bhavcopyDF['CLOSE'] > bhavcopyDF['OPEN'] ) ) &
         ( ( bhavcopyDF['OPEN'] > bhavcopyDF['PREVCLOSE'] ) & ( bhavcopyDF['CLOSE'] < bhavcopyDF['PREVOPEN'] ) ),
         ['OPEN','PREVCLOSE','CLOSE','PREVOPEN']
     ]
+    if not haramiDF.empty:
+            print('\n{} stocks show Bullish Harami Candlestick pattern'.format(len(haramiDF)))
+            for stock in haramiDF.index:
+                print(stock)
+    else:
+        print('\nNo stocks with Bullish Harami pattern')
 
 def main():
     #Load config file. The file config.ini must be in the same folder/directory as this python program
@@ -249,7 +258,7 @@ def main():
         prevDayBhavDF = getBhavCopyData(df.index, prevBhavFile)
         df['PREVOPEN'] = prevDayBhavDF['OPEN']
 
-    
+    #SCAN FOR THE CANDLESTICK PRICE ACTION PATTERNS AND DISPLAY THE RESULTS
     #Bullish Hammer Pattern
     MULTIPLIER = candlestickScanner.getfloat('tailtobodyratio')
     getBullishHammer(df,MULTIPLIER)
@@ -262,20 +271,13 @@ def main():
 
     #Bullish Engulfing Pattern
     if found:
-        getBullishEngulfing(df,prevBhavFile)
+        getBullishEngulfing(df,found)
 
 
     #Bullish Harami Pattern
-    if not fileValidityCheck(prevBhavFile):
-        print('Previous day bhavcopy not found. Hence cannot find the bullish harami pattern')
-    else:
-        haramiDF = getBullishHarami(df)
-        if not haramiDF.empty:
-            print('\n{} stocks show Bullish Harami Candlestick pattern'.format(len(haramiDF)))
-            for stock in haramiDF.index:
-                print(stock)
-        else:
-            print('\nNo stocks with Bullish Harami pattern')
+    if found:
+        getBullishHarami(df,found)
+        
 
 if __name__  == "__main__":
     main()
