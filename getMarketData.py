@@ -23,50 +23,50 @@ from pathlib import Path
 # In[17]:
 
 
-def downloadUnzip(url,filepath):
+def downloadUnzip(url,filepath, verbose=True):
     '''Download file and unzip the compressed file. If file cannot be 
     found/uncompressed it return False. Else returns True'''
     if not os.path.exists(filepath):
-        print('Downloading file from URL:',url)
+        if verbose: print('Downloading file from URL:',url)
         zFilePath = filepath + '.zip'
         zfile = open(zFilePath,'wb')
         with requests.get(url,verify=False, stream=True) as response:
             for chunks in response.iter_content(chunk_size=1024):
                 zfile.write(chunks)
         zfile.close()
-        print('Downloading Zip File complete')
-        print('Uncompressing File:',zFilePath)
+        if verbose: print('Downloading Zip File complete')
+        if verbose: print('Uncompressing File:',zFilePath)
         try:
             with zipfile.ZipFile(zFilePath,'r') as compressedFile:
                 compressedFile.extractall(Path(zFilePath).parent)
         except zipfile.BadZipFile as e:
             print('Uncompression Failure! BadZipFile',e.with_traceback)
             return False
-        print('File Decompression Success!')
-        print('Uncompressed File path:',filepath)
+        if verbose: print('File Decompression Success!')
+        if verbose: print('Uncompressed File path:',filepath)
         os.remove(zFilePath)
-    # else:
-    #     print('File already exists:',filepath)
+    else:
+        if verbose: print('File already exists:',filepath)
     return True
 
 
 # In[18]:
 
 
-def fetchBhavcopy(bhavDay, FOLDER_NAME, bhavFilePath):
+def fetchBhavcopy(bhavDay, FOLDER_NAME, bhavFilePath, verbose=True):
     '''Fetches bhavcopy from NSE website for given date (bhavDay) and saves the
     uncompressed csv file at path(bhavFilepath) in given Directory(FOLDER_NAME)'''
     year = bhavDay[5:]
     month = bhavDay[2:5]
     if not os.path.exists(FOLDER_NAME):
-        print('Directory:',FOLDER_NAME,'does not exists')
+        if verbose: print('Directory:',FOLDER_NAME,'does not exists')
         os.makedirs(FOLDER_NAME)
-        print('Directory:',FOLDER_NAME,'created!')
+        if verbose: print('Directory:',FOLDER_NAME,'created!')
     # else:
     #     print('Directory:',FOLDER_NAME,'exists')
     bhavURL = 'https://archives.nseindia.com/content/historical/EQUITIES/{0}/{1}/cm{2}bhav.csv.zip'.format(year,month,bhavDay)
     # print(bhavURL)
-    return downloadUnzip(bhavURL,bhavFilePath)
+    return downloadUnzip(bhavURL,bhavFilePath, verbose)
     
 
 
