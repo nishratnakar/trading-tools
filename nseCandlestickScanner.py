@@ -231,9 +231,11 @@ def main():
 
     if found:#Will use bhavcopy for analysis if available.
         if VERBOSE: print('Bhavcopy fetched successfully for date:',theDayStr)
+        else: print('Date:',theDayStr)
         df = getBhavCopyData(df.index,BHAV)
     else:#Else use the live trade csvfile
         if VERBOSE: print('No Bhavcopy found! Proceeding with live market data CSV file for data analysis\n')
+        else: print('Date:',theDayStr)
 
     #First filteration: Eliminate stocks whose prices are lower or upper than the set price band
     LOW_LIMIT = candlestickScanner.getint('lowerpricelimit')
