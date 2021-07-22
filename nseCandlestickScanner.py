@@ -156,6 +156,15 @@ def getBullishHarami(bhavcopyDF, prevBhavFound):
     else:
         print('No stocks with Bullish Harami pattern')
 
+def scanAllPatterns(args):
+    '''Returns False if at least one pattern is specified as a commandline option.
+    Else returns True'''
+    if args.hammer: return False
+    if args.marubozu: return False
+    if args.engulfing: return False
+    if args.harami: return False
+    else: return True
+
 def main():
     #Load config file. The file config.ini must be in the same folder/directory as this python program
     config = configparser.ConfigParser()
@@ -165,6 +174,10 @@ def main():
     parser = argparse.ArgumentParser(description='NSE Candlestick Pattern Scanner')
     parser.add_argument('-v','--verbose', action='store_true', default=False, help='Add verbosity')
     parser.add_argument('-d', '--delta', type=int, default=0, help='Offset to scan using backdate. Default is %(default)s days')
+    parser.add_argument('-H','--hammer', action='store_true',default=False, help='Hammer pattern scan')
+    parser.add_argument('-M','--marubozu', action='store_true', default=False, help='Marubozu pattern scan')
+    parser.add_argument('-E','--engulfing', action='store_true', default=False, help='Engulfing pattern scan')
+    parser.add_argument('-A','--harami', action='store_true', default=False, help='Harami pattern scan')
     args = parser.parse_args()
 
     holidayList = candlestickScanner['holidays'].strip().split(',') #List of NSE trading holidays that are on weekday
@@ -173,6 +186,8 @@ def main():
     global VERBOSE
     VERBOSE = args.verbose
     
+    SCAN_ALL = scanAllPatterns(args)
+
     #offset value for calculating date. Default is 0 days
     backDate = args.delta
     if VERBOSE:
@@ -264,22 +279,24 @@ def main():
 
     #SCAN FOR THE CANDLESTICK PRICE ACTION PATTERNS AND DISPLAY THE RESULTS
     #Bullish Hammer Pattern
-    MULTIPLIER = candlestickScanner.getfloat('tailtobodyratio')
-    getBullishHammer(df,MULTIPLIER)
+    if SCAN_ALL or args.hammer:
+        MULTIPLIER = candlestickScanner.getfloat('tailtobodyratio')
+        getBullishHammer(df,MULTIPLIER)
     
 
     #Bullish Marubozu Pattern
-    MARUBOZU_WICK_RATIO = candlestickScanner.getfloat('marubozuShadow')
-    getBullishMarubozu(df, MARUBOZU_WICK_RATIO)
+    if SCAN_ALL or args.marubozu:
+        MARUBOZU_WICK_RATIO = candlestickScanner.getfloat('marubozuShadow')
+        getBullishMarubozu(df, MARUBOZU_WICK_RATIO)
     
 
     #Bullish Engulfing Pattern
-    if found:
+    if SCAN_ALL or args.engulfing:
         getBullishEngulfing(df,found)
 
 
     #Bullish Harami Pattern
-    if found:
+    if SCAN_ALL or args.harami:
         getBullishHarami(df,found)
         
 
