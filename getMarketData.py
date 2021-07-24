@@ -30,7 +30,25 @@ def downloadUnzip(url,filepath, verbose=True):
         if verbose: print('Downloading file from URL:',url)
         zFilePath = filepath + '.zip'
         zfile = open(zFilePath,'wb')
-        with requests.get(url,verify=False, stream=True) as response:
+        #NSEIndia doesn't let python program to download bhavcopy unless headers are set.
+        #Found this solution on stackoverflow as way to access bhavcopy via python by setting headers and session
+        hdr = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.190 Safari/537.36',
+       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*,q=0.8,application/signed-exchange;v=b3;q=0.9',
+       'Accept-Encoding': 'gzip, deflate, br',
+       'Accept-Charset': 'ISO-8859-1,utf-8;q=0.7,*;q=0.3',
+       'Accept-Encoding': 'gzip, deflate, br',
+       'Accept-Language': 'en-IN,en;q=0.9,en-GB;q=0.8,en-US;q=0.7,hi;q=0.6',
+       'Connection': 'keep-alive','Host':'www1.nseindia.com',
+       'Cache-Control':'max-age=0',
+       'Host':'www1.nseindia.com',
+       'Referer':'https://www1.nseindia.com/products/content/derivatives/equities/fo.htm',
+       }
+        cookie_dict={'bm_sv':'E2109FAE3F0EA09C38163BBF24DD9A7E~t53LAJFVQDcB/+q14T3amyom/sJ5dm1gV7z2R0E3DKg6WiKBpLgF0t1Mv32gad4CqvL3DIswsfAKTAHD16vNlona86iCn3267hHmZU/O7DrKPY73XE6C4p5geps7yRwXxoUOlsqqPtbPsWsxE7cyDxr6R+RFqYMoDc9XuhS7e18='}
+        session = requests.session()
+        for cookie in cookie_dict:
+            session.cookies.set(cookie,cookie_dict[cookie])
+        
+        with session.get(url,headers = hdr) as response:
             for chunks in response.iter_content(chunk_size=1024):
                 zfile.write(chunks)
         zfile.close()
