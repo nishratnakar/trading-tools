@@ -156,6 +156,26 @@ def getBullishHarami(bhavcopyDF, prevBhavFound):
     else:
         print('No stocks with Bullish Harami pattern')
 
+def getBullishOutsideBar(bhavcopyDF, prevBhavFound):
+    '''Gets stocks that are forming Bullish Outside bar reversal pattern'''
+    print('\nBULLISH OUTSIDE BAR CANDLESTICK SCAN')
+    print('----------------------------------')
+    if not prevBhavFound:
+        print('Previous trading session data file not found. Cannot scan for Bullish Outside Bar pattern')
+        return
+    outsideDF = bhavcopyDF.loc[
+            ( ( bhavcopyDF['PREVOPEN'] > bhavcopyDF['PREVCLOSE'] ) & ( bhavcopyDF['CLOSE'] > bhavcopyDF['OPEN'] ) ) &
+            ( ( bhavcopyDF['LOW'] < bhavcopyDF['PREVLOW'] ) & ( bhavcopyDF['CLOSE'] > bhavcopyDF['PREVHIGH'] ) ),
+            ['OPEN','PREVCLOSE','CLOSE','PREVOPEN']
+        ]
+    if len(outsideDF) > 0:
+        if VERBOSE: print('{} stocks show Bullish Outside Bar Candlestick pattern'.format(len(outsideDF)))
+        for stock in outsideDF.index:
+            print(stock)
+    else:
+        print('No stocks with Bullish Outside Bar pattern')
+
+
 def scanAllPatterns(args):
     '''Returns False if at least one pattern is specified as a commandline option.
     Else returns True'''
@@ -163,6 +183,7 @@ def scanAllPatterns(args):
     if args.marubozu: return False
     if args.engulfing: return False
     if args.harami: return False
+    if args.outside: return False
     else: return True
 
 def main():
@@ -178,6 +199,7 @@ def main():
     parser.add_argument('-M','--marubozu', action='store_true', default=False, help='Marubozu pattern scan')
     parser.add_argument('-E','--engulfing', action='store_true', default=False, help='Engulfing pattern scan')
     parser.add_argument('-A','--harami', action='store_true', default=False, help='Harami pattern scan')
+    parser.add_argument('-O','--outside', action='store_true', default=False, help='Outside Bar pattern scan')
     args = parser.parse_args()
 
     holidayList = candlestickScanner['holidays'].strip().split(',') #List of NSE trading holidays that are on weekday
@@ -276,6 +298,8 @@ def main():
     if found:
         prevDayBhavDF = getBhavCopyData(df.index, prevBhavFile)
         df['PREVOPEN'] = prevDayBhavDF['OPEN']
+        df['PREVLOW'] = prevDayBhavDF['LOW']
+        df['PREVHIGH'] = prevDayBhavDF['HIGH']
 
     #SCAN FOR THE CANDLESTICK PRICE ACTION PATTERNS AND DISPLAY THE RESULTS
     #Bullish Hammer Pattern
@@ -283,21 +307,22 @@ def main():
         MULTIPLIER = candlestickScanner.getfloat('tailtobodyratio')
         getBullishHammer(df,MULTIPLIER)
     
-
     #Bullish Marubozu Pattern
     if SCAN_ALL or args.marubozu:
         MARUBOZU_WICK_RATIO = candlestickScanner.getfloat('marubozuShadow')
         getBullishMarubozu(df, MARUBOZU_WICK_RATIO)
     
-
     #Bullish Engulfing Pattern
     if SCAN_ALL or args.engulfing:
-        getBullishEngulfing(df,found)
+        getBullishEngulfing(df, found)
 
+    #Bullish Outside Bar Pattern
+    if SCAN_ALL or args.outside:
+        getBullishOutsideBar(df, found)
 
     #Bullish Harami Pattern
     if SCAN_ALL or args.harami:
-        getBullishHarami(df,found)
+        getBullishHarami(df, found)
         
 
 if __name__  == "__main__":
